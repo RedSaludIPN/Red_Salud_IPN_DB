@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REI06-RSAL | Red de Salud — Instituto Politécnico Nacional</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════════
+   IDENTIDAD VISUAL IPN — Red de Salud CORIyP
+   Colores tomados de: ipn.mx/coriyp/red-inves/salud-coriyp/
+   ════════════════════════════════════════════════════ */
+:root {
+  /* Paleta IPN institucional */
+  --guinda:      #6A1537;   /* Guinda IPN oficial */
+  --guinda-dark: #4E0E28;   /* Guinda oscuro */
+  --guinda-mid:  #8B1A45;   /* Guinda medio */
+  --guinda-pale: #F5E8ED;   /* Guinda muy claro */
+  --guinda-soft: #FAEDF2;   /* Fondo suave */
+  --gold:        #C8960C;   /* Dorado IPN */
+  --gold-light:  #F5E6C0;   /* Dorado claro */
+  --gold-pale:   #FDF8EC;   /* Dorado muy claro */
+  --gob-blue:    #0B3D5E;   /* Barra de gobierno */
+
+  /* Neutrales */
+  --white:       #FFFFFF;
+  --bg:          #F7F7F7;
+  --bg2:         #EEEEEE;
+  --border:      #DDDDDD;
+  --border2:     #CCCCCC;
+  --text:        #333333;
+  --text2:       #555555;
+  --text3:       #888888;
+  --link:        #6A1537;
+
+  /* Tipografía IPN */
+  --font-head:   'Montserrat', Arial, sans-serif;
+  --font-body:   'Open Sans', Arial, sans-serif;
+
+  /* Layout */
+  --sidebar-w:   248px;
+  --radius:      4px;
+  --radius-lg:   6px;
+  --shadow:      0 2px 8px rgba(0,0,0,0.10);
+  --shadow-lg:   0 4px 20px rgba(0,0,0,0.14);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── BARRA DE GOBIERNO ─────────────────────────────── */
+.gov-bar {
+  background: var(--gob-blue);
+  padding: 4px 0;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255,255,255,0.8);
+  font-family: var(--font-body);
+  letter-spacing: 0.3px;
+}
+
+/* ── SIDEBAR ───────────────────────────────────────── */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: var(--sidebar-w);
+  background: var(--guinda);
+  display: flex; flex-direction: column;
+  z-index: 200;
+  overflow-y: auto;
+  transition: transform 0.28s ease;
+}
+
+.sidebar-brand {
+  padding: 0;
+  background: var(--guinda-dark);
+}
+.sidebar-brand-top {
+  padding: 16px 18px 12px;
+  border-bottom: 3px solid var(--gold);
+}
+.brand-code {
+  font-family: var(--font-head);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.brand-title {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.15;
+  margin-bottom: 3px;
+}
+.brand-sub {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+.brand-ipn {
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.2);
+}
+.ipn-seal {
+  width: 32px; height: 32px;
+  background: var(--gold);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head);
+  font-weight: 800; font-size: 10px; color: var(--guinda-dark);
+  flex-shrink: 0;
+}
+.ipn-label {
+  font-size: 9.5px; color: rgba(255,255,255,0.65);
+  line-height: 1.4;
+}
+.ipn-label strong {
+  display: block; font-weight: 600;
+  color: rgba(255,255,255,0.9); font-size: 10px;
+}
+
+/* Sync status */
+.sync-status {
+  padding: 7px 18px;
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(0,0,0,0.15);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 10px; color: rgba(255,255,255,0.45);
+}
+.sync-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--gold); flex-shrink: 0;
+}
+.sync-dot.live { animation: blink 2.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+/* Nav */
+.nav-group { padding: 14px 10px 4px; }
+.nav-label {
+  font-size: 9px; font-family: var(--font-head);
+  font-weight: 700; color: rgba(255,255,255,0.3);
+  letter-spacing: 2px; text-transform: uppercase;
+  padding: 0 8px; margin-bottom: 4px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: var(--radius);
+  cursor: pointer; color: rgba(255,255,255,0.72);
+  font-size: 13px; font-weight: 400;
+  font-family: var(--font-body);
+  transition: all 0.15s; border: none; background: none;
+  width: 100%; text-align: left;
+}
+.nav-item:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.nav-item.active {
+  background: rgba(255,255,255,0.15);
+  color: #fff; font-weight: 600;
+  border-left: 3px solid var(--gold);
+  padding-left: 7px;
+}
+.nav-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto; background: var(--gold);
+  color: var(--guinda-dark); font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center;
+}
+
+.nav-divider {
+  height: 1px; background: rgba(255,255,255,0.08);
+  margin: 8px 10px;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 9.5px; color: rgba(255,255,255,0.3);
+  line-height: 1.7;
+}
+.sidebar-footer span { color: var(--gold); }
+
+/* ── HAMBURGER ─────────────────────────────────────── */
+.hamburger {
+  display: none; flex-direction: column;
+  gap: 5px; cursor: pointer;
+  background: none; border: none; padding: 6px;
+}
+.hamburger span {
+  display: block; width: 22px; height: 2px;
+  background: var(--guinda); border-radius: 2px;
+  transition: all 0.2s;
+}
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); z-index: 150;
+}
+.sidebar-overlay.open { display: block; }
+
+/* ── MAIN ──────────────────────────────────────────── */
+.main { margin-left: var(--sidebar-w); min-height: 100vh; }
+
+/* ── TOPBAR ────────────────────────────────────────── */
+.topbar {
+  background: var(--white);
+  border-bottom: 3px solid var(--guinda);
+  padding: 0 28px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: var(--shadow);
+}
+.topbar-inner {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  height: 52px;
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.topbar-crumb {
+  font-family: var(--font-head); font-size: 13px;
+  font-weight: 600; color: var(--guinda);
+}
+.topbar-sep { color: var(--border2); font-size: 16px; }
+.topbar-page {
+  font-size: 13px; color: var(--text2); font-weight: 400;
+  font-family: var(--font-body);
+}
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+.btn {
+  padding: 7px 16px; border-radius: var(--radius);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  border: none; transition: all 0.15s;
+  font-family: var(--font-body); letter-spacing: 0.2px;
+}
+.btn-guinda { background: var(--guinda); color: #fff; }
+.btn-guinda:hover { background: var(--guinda-mid); }
+.btn-outline {
+  background: transparent; color: var(--guinda);
+  border: 1.5px solid var(--guinda);
+}
+.btn-outline:hover { background: var(--guinda-pale); }
+.btn-gold { background: var(--gold); color: #fff; }
+.btn-gold:hover { background: #b8860b; }
+.btn-sm { padding: 5px 11px; font-size: 11.5px; }
+.btn-danger { background: #FFF0F0; color: #C0392B; border: 1px solid #F5B7B1; }
+
+/* Admin indicator */
+#admin-indicator {
+  font-size: 11px; font-family: var(--font-head);
+  font-weight: 600; color: var(--gold);
+  background: var(--guinda-dark); border: 1px solid var(--gold);
+  padding: 4px 12px; border-radius: var(--radius);
+  display: none; align-items: center; gap: 7px;
+}
+
+/* ── SECTIONS ──────────────────────────────────────── */
+.section { display: none; padding: 28px 28px 40px; animation: fadeIn 0.2s ease; }
+.section.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── HERO / BANNER ─────────────────────────────────── */
+.hero-banner {
+  background: linear-gradient(135deg, var(--guinda-dark) 0%, var(--guinda) 60%, var(--guinda-mid) 100%);
+  border-radius: var(--radius-lg);
+  padding: 36px 40px;
+  color: #fff; margin-bottom: 24px;
+  position: relative; overflow: hidden;
+}
+.hero-banner::before {
+  content:''; position:absolute; right:-30px; top:-30px;
+  width:220px; height:220px; border-radius:50%;
+  background:rgba(200,150,12,0.12);
+}
+.hero-banner::after {
+  content:''; position:absolute; right:80px; bottom:-50px;
+  width:150px; height:150px; border-radius:50%;
+  background:rgba(255,255,255,0.05);
+}
+.hero-code {
+  font-family: var(--font-head); font-size: 10px; font-weight: 700;
+  color: var(--gold); letter-spacing: 3px; text-transform: uppercase;
+  margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.hero-code::before { content:''; width:24px; height:2px; background:var(--gold); }
+.hero-title {
+  font-family: var(--font-head); font-size: 32px; font-weight: 800;
+  line-height: 1.15; margin-bottom: 10px; color: #fff;
+}
+.hero-desc {
+  font-size: 13.5px; color: rgba(255,255,255,0.75);
+  max-width: 580px; line-height: 1.7; margin-bottom: 24px;
+}
+.hero-stats {
+  display: flex; gap: 32px; flex-wrap: wrap;
+  padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.15);
+}
+.hero-stat .num {
+  font-family: var(--font-head); font-size: 30px; font-weight: 800;
+  color: var(--gold); line-height: 1;
+}
+.hero-stat .lbl {
+  font-size: 11px; color: rgba(255,255,255,0.55);
+  margin-top: 2px; font-weight: 400;
+}
+
+/* ── STAT CARDS ────────────────────────────────────── */
+.stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+.stat-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-top: 3px solid var(--guinda);
+  border-radius: var(--radius-lg); padding: 18px 18px 16px;
+  box-shadow: var(--shadow);
+}
+.stat-card .sc-num {
+  font-family: var(--font-head); font-size: 28px; font-weight: 800;
+  color: var(--guinda); line-height: 1; margin-bottom: 4px;
+}
+.stat-card .sc-lbl {
+  font-size: 11px; color: var(--text3); font-weight: 400;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.stat-card .sc-icon { float: right; font-size: 20px; }
+
+/* ── CARDS ─────────────────────────────────────────── */
+.card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow);
+}
+.card-header {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(90deg, var(--guinda-soft), var(--white));
+}
+.card-header h3 {
+  font-family: var(--font-head); font-size: 13.5px; font-weight: 700;
+  color: var(--guinda); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.card-body { padding: 18px 20px; }
+
+/* ── SECTION HEADER ────────────────────────────────── */
+.section-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 20px; padding-bottom: 12px;
+  border-bottom: 2px solid var(--guinda);
+}
+.sh-left {}
+.sh-eyebrow {
+  font-size: 10px; font-family: var(--font-head); font-weight: 700;
+  color: var(--gold); letter-spacing: 2.5px; text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.sh-title {
+  font-family: var(--font-head); font-size: 22px; font-weight: 800;
+  color: var(--guinda); line-height: 1;
+}
+.sh-actions { display: flex; gap: 8px; }
+
+/* ── RESEARCHER GRID ───────────────────────────────── */
+.researcher-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+.rc {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  cursor: pointer; transition: all 0.18s; box-shadow: var(--shadow);
+}
+.rc:hover {
+  transform: translateY(-2px); box-shadow: var(--shadow-lg);
+  border-color: var(--guinda);
+}
+.rc-header {
+  background: var(--guinda); padding: 18px 18px 16px;
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.rc-monogram {
+  width: 50px; height: 50px; flex-shrink: 0;
+  background: var(--gold); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head); font-size: 17px; font-weight: 800;
+  color: var(--guinda-dark); border: 2px solid rgba(255,255,255,0.3);
+}
+.rc-name {
+  font-family: var(--font-head); font-size: 13.5px; font-weight: 700;
+  color: #fff; line-height: 1.25;
+}
+.rc-dept { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 3px; }
+.rc-unit {
+  font-size: 9.5px; font-family: var(--font-head); font-weight: 700;
+  color: var(--gold); letter-spacing: 1px; margin-top: 4px;
+  background: rgba(0,0,0,0.2); display: inline-block;
+  padding: 2px 8px; border-radius: var(--radius);
+}
+.rc-body { padding: 13px 16px 14px; }
+.rc-area {
+  display: inline-block; font-size: 9.5px; font-family: var(--font-head);
+  font-weight: 600; color: var(--guinda); background: var(--guinda-pale);
+  padding: 2px 9px; border-radius: var(--radius);
+  text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;
+}
+.rc-bio {
+  font-size: 12px; color: var(--text2); line-height: 1.6;
+  margin-bottom: 8px;
+}
+.rc-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.rc-tag {
+  font-size: 10.5px; color: var(--text2); background: var(--bg);
+  border: 1px solid var(--border); padding: 2px 8px;
+  border-radius: var(--radius); font-family: var(--font-body);
+}
+.rc-meta {
+  font-size: 11px; color: var(--text3);
+  display: flex; gap: 12px; flex-wrap: wrap;
+  padding-top: 9px; border-top: 1px solid var(--border);
+}
+.rc-links {
+  display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap;
+}
+.pl-link {
+  font-size: 11px; font-family: var(--font-head); font-weight: 600;
+  color: var(--guinda); border: 1px solid var(--guinda);
+  padding: 3px 10px; border-radius: var(--radius);
+  text-decoration: none; transition: all 0.15s;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.pl-link:hover { background: var(--guinda); color: #fff; }
+
+/* ── FILTERS ───────────────────────────────────────── */
+.filter-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 18px; align-items: center;
+}
+.fc {
+  padding: 6px 14px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--border2); background: var(--white);
+  color: var(--text2); font-family: var(--font-body);
+  border-radius: var(--radius); transition: all 0.15s;
+}
+.fc:hover, .fc.active { background: var(--guinda); color: #fff; border-color: var(--guinda); }
+.search-bar {
+  background: var(--white); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 7px 13px;
+  font-size: 13px; font-family: var(--font-body);
+  color: var(--text); outline: none; flex: 1; max-width: 300px;
+  transition: border 0.15s;
+}
+.search-bar:focus { border-color: var(--guinda); }
+.search-bar::placeholder { color: var(--text3); }
+
+/* ── PROJECTS ──────────────────────────────────────── */
+.project-item {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 18px 20px;
+  margin-bottom: 12px; box-shadow: var(--shadow);
+  border-left: 4px solid var(--guinda); transition: all 0.15s;
+}
+.project-item:hover { box-shadow: var(--shadow-lg); }
+.project-title {
+  font-family: var(--font-head); font-size: 14.5px; font-weight: 700;
+  color: var(--guinda); margin-bottom: 7px; line-height: 1.4;
+}
+.project-desc { font-size: 12.5px; color: var(--text2); line-height: 1.65; margin-bottom: 10px; }
+.project-meta { display: flex; gap: 18px; font-size: 11.5px; color: var(--text3); flex-wrap: wrap; }
+.project-meta span::before { margin-right: 4px; }
+.project-collabs { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.p-chip {
+  font-size: 11px; background: var(--guinda-pale); color: var(--guinda);
+  padding: 3px 10px; border-radius: var(--radius);
+  font-family: var(--font-body);
+}
+.p-status {
+  display: inline-block; font-size: 10.5px; font-family: var(--font-head);
+  font-weight: 600; padding: 3px 10px; border-radius: var(--radius);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.s-active { background: #E8F5EC; color: #1E7D35; border: 1px solid #B8D9BF; }
+.s-review { background: var(--gold-pale); color: #8B6914; border: 1px solid var(--gold-light); }
+.s-done   { background: var(--bg2); color: var(--text3); border: 1px solid var(--border); }
+
+/* ── PUBLICATIONS ──────────────────────────────────── */
+.pub-item {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 15px 18px;
+  margin-bottom: 10px; display: flex; gap: 14px;
+  box-shadow: var(--shadow); transition: border 0.15s;
+}
+.pub-item:hover { border-color: var(--guinda); }
+.pub-year {
+  font-family: var(--font-head); font-size: 11px; font-weight: 700;
+  color: var(--white); background: var(--guinda);
+  padding: 3px 8px; border-radius: var(--radius);
+  white-space: nowrap; align-self: flex-start; min-width: 42px; text-align: center;
+}
+.pub-title {
+  font-family: var(--font-head); font-size: 13.5px; font-weight: 600;
+  color: var(--guinda); margin-bottom: 4px; line-height: 1.4;
+}
+.pub-authors { font-size: 11.5px; color: var(--text3); margin-bottom: 4px; }
+.pub-journal { font-size: 12px; color: var(--text2); font-style: italic; }
+.pub-actions { display: flex; gap: 6px; margin-top: 8px; }
+
+/* ── MODAL ─────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(3px);
+  z-index: 1000; display: none; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
+.modal {
+  background: var(--white); border-radius: var(--radius-lg);
+  width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+.modal-head {
+  background: var(--guinda); padding: 20px 24px;
+  border-bottom: 3px solid var(--gold);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  position: relative;
+}
+.modal-head h2 {
+  font-family: var(--font-head); font-size: 18px; font-weight: 700; color: #fff;
+}
+.modal-head p { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+.modal-close {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,0.15); border: none; color: #fff;
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  font-size: 15px; display: flex; align-items: center; justify-content: center;
+}
+.modal-body { padding: 24px; }
+.modal-tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+.m-tab {
+  padding: 9px 16px; border: none; background: none; cursor: pointer;
+  font-size: 12px; font-family: var(--font-head); font-weight: 600;
+  color: var(--text3); border-bottom: 2px solid transparent;
+  margin-bottom: -2px; transition: all 0.15s; text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.m-tab.active { color: var(--guinda); border-bottom-color: var(--guinda); }
+.m-tab-content { display: none; }
+.m-tab-content.active { display: block; }
+
+/* ── FORM ──────────────────────────────────────────── */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.form-row.full { grid-template-columns: 1fr; }
+.fg { display: flex; flex-direction: column; gap: 5px; }
+.fg label {
+  font-size: 11px; font-weight: 700; font-family: var(--font-head);
+  color: var(--guinda); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.fg input, .fg select, .fg textarea {
+  padding: 8px 11px; border: 1px solid var(--border2); border-radius: var(--radius);
+  font-size: 13px; font-family: var(--font-body);
+  background: var(--white); color: var(--text); outline: none; transition: border 0.15s;
+}
+.fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--guinda); }
+.fg textarea { resize: vertical; min-height: 78px; }
+
+/* ── INFO ROWS ─────────────────────────────────────── */
+.info-row {
+  display: flex; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid var(--border); align-items: flex-start;
+}
+.info-row:last-child { border-bottom: none; }
+.ir-label {
+  font-size: 10.5px; font-family: var(--font-head); font-weight: 700;
+  color: var(--text3); min-width: 150px; text-transform: uppercase;
+  letter-spacing: 0.5px; padding-top: 1px;
+}
+.ir-value { font-size: 13px; color: var(--text); }
+
+/* ── DROPZONE ──────────────────────────────────────── */
+.dropzone {
+  border: 2px dashed var(--border2); border-radius: var(--radius-lg);
+  padding: 28px; text-align: center; cursor: pointer;
+  transition: all 0.18s; background: var(--bg);
+}
+.dropzone:hover { border-color: var(--guinda); background: var(--guinda-soft); }
+.dropzone-icon { font-size: 28px; margin-bottom: 8px; }
+.dropzone-title { font-family: var(--font-head); font-size: 14px; font-weight: 600; color: var(--guinda); }
+.dropzone-sub { font-size: 12px; color: var(--text3); margin-top: 5px; }
+
+/* ── TABLES ────────────────────────────────────────── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.data-table th {
+  background: var(--guinda-pale); padding: 9px 12px; text-align: left;
+  font-family: var(--font-head); font-size: 10.5px; font-weight: 700;
+  color: var(--guinda); text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--guinda);
+}
+.data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text2); }
+.data-table tr:hover td { background: var(--guinda-soft); }
+.data-table tr:last-child td { border-bottom: none; }
+
+/* ── MAP ───────────────────────────────────────────── */
+#map-container, #network-container {
+  width: 100%; border: 1px solid var(--border);
+  border-radius: var(--radius-lg); background: var(--bg); position: relative; overflow: hidden;
+}
+#map-container { height: 460px; }
+#network-container { height: 420px; }
+.map-legend { display: flex; gap: 18px; margin-top: 10px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── GRID HELPERS ──────────────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+.mt-16 { margin-top: 16px; }
+.mt-20 { margin-top: 20px; }
+
+/* ── LOGIN ─────────────────────────────────────────── */
+.login-overlay {
+  position: fixed; inset: 0;
+  background: rgba(74,14,40,0.85); backdrop-filter: blur(6px);
+  z-index: 2000; display: none; align-items: center; justify-content: center;
+}
+.login-overlay.open { display: flex; }
+.login-box {
+  background: var(--white); border-radius: var(--radius-lg);
+  padding: 40px 36px; width: 360px; max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  border-top: 4px solid var(--gold);
+}
+.login-logo {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+}
+.login-seal {
+  width: 40px; height: 40px; background: var(--guinda); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head); font-weight: 800; font-size: 12px; color: var(--gold);
+}
+.login-box h3 {
+  font-family: var(--font-head); font-size: 20px; font-weight: 800; color: var(--guinda);
+}
+.login-box p { font-size: 12px; color: var(--text3); margin-bottom: 22px; line-height: 1.5; }
+.login-box input {
+  width: 100%; padding: 10px 12px; border: 1.5px solid var(--border2);
+  border-radius: var(--radius); font-size: 13.5px; font-family: var(--font-body);
+  background: var(--white); color: var(--text); outline: none; margin-bottom: 10px;
+  transition: border 0.15s;
+}
+.login-box input:focus { border-color: var(--guinda); }
+.login-error {
+  font-size: 11.5px; color: #C0392B; margin-bottom: 10px; display: none;
+  font-family: var(--font-body);
+}
+.login-box .btn { width: 100%; padding: 10px; font-size: 13px; }
+
+/* ── NOTIFICATION ──────────────────────────────────── */
+.notification {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--guinda); color: #fff;
+  padding: 11px 18px; border-radius: var(--radius-lg);
+  font-size: 13px; font-family: var(--font-body);
+  z-index: 3000; display: none; align-items: center; gap: 9px;
+  box-shadow: var(--shadow-lg); border-left: 3px solid var(--gold);
+}
+.notification.show { display: flex; animation: slideUp 0.3s ease; }
+@keyframes slideUp { from{transform:translateY(14px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+/* ── EMPTY STATE ───────────────────────────────────── */
+.empty-state { text-align: center; padding: 48px 20px; color: var(--text3); }
+.empty-icon { font-size: 36px; margin-bottom: 12px; }
+.empty-title { font-family: var(--font-head); font-size: 15px; font-weight: 700; color: var(--text2); margin-bottom: 5px; }
+.empty-desc { font-size: 13px; line-height: 1.6; }
+
+/* ── ADMIN ─────────────────────────────────────────── */
+.admin-only { display: none; }
+.is-admin .admin-only { display: flex; }
+.is-admin .admin-nav { display: block; }
+.admin-nav { display: none; }
+
+/* ── MÉTRICAS DE PUBLICACIONES ─────────────────────── */
+.metrics-section {
+  margin-bottom: 24px;
+}
+.metrics-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.metrics-title {
+  font-family: var(--font-head); font-size: 13px; font-weight: 700;
+  color: var(--guinda); text-transform: uppercase; letter-spacing: 0.8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.metrics-title::before { content:''; display:inline-block; width:3px; height:14px; background:var(--gold); border-radius:2px; }
+.metrics-year-badge {
+  font-family: var(--font-head); font-size: 10px; font-weight: 700;
+  color: var(--white); background: var(--guinda);
+  padding: 3px 10px; border-radius: var(--radius); letter-spacing: 0.5px;
+}
+
+/* METRIC CARDS GRID */
+.metric-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;
+  margin-bottom: 16px;
+}
+.metric-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 14px 14px 12px;
+  text-align: center; position: relative; overflow: hidden;
+  box-shadow: var(--shadow); transition: transform 0.15s;
+}
+.metric-card:hover { transform: translateY(-1px); }
+.metric-card::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+}
+.metric-card.total::after { background: var(--guinda); }
+.metric-card.q1::after    { background: #1E7D35; }
+.metric-card.q2::after    { background: #1A5A9A; }
+.metric-card.q3::after    { background: #C8960C; }
+.metric-card.q4::after    { background: #8B5A2B; }
+.metric-card.ni::after     { background: var(--border2); }
+
+.metric-num {
+  font-family: var(--font-head); font-size: 28px; font-weight: 800;
+  line-height: 1; margin-bottom: 4px;
+}
+.metric-card.total .metric-num { color: var(--guinda); }
+.metric-card.q1    .metric-num { color: #1E7D35; }
+.metric-card.q2    .metric-num { color: #1A5A9A; }
+.metric-card.q3    .metric-num { color: #C8960C; }
+.metric-card.q4    .metric-num { color: #8B5A2B; }
+.metric-card.ni    .metric-num { color: var(--text3); }
+
+.metric-lbl {
+  font-family: var(--font-head); font-size: 10px; font-weight: 700;
+  color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px;
+}
+.metric-sub {
+  font-size: 10px; color: var(--text3); margin-top: 3px; line-height: 1.3;
+}
+.metric-badge {
+  position: absolute; top: 8px; right: 8px;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 800; font-family: var(--font-head);
+  color: white;
+}
+.metric-card.q1 .metric-badge { background: #1E7D35; }
+.metric-card.q2 .metric-badge { background: #1A5A9A; }
+.metric-card.q3 .metric-badge { background: #C8960C; }
+.metric-card.q4 .metric-badge { background: #8B5A2B; }
+
+/* CHARTS ROW */
+.charts-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.chart-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow);
+}
+.chart-title {
+  font-family: var(--font-head); font-size: 11.5px; font-weight: 700;
+  color: var(--guinda); text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+
+/* CUARTIL BARS */
+.quartile-bar-row { margin-bottom: 9px; }
+.qb-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.qb-label { font-size: 11px; font-family: var(--font-head); font-weight: 700; }
+.qb-count { font-size: 11px; color: var(--text3); font-family: var(--font-head); font-weight: 600; }
+.qb-track { height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
+.qb-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+
+/* YEAR BARS */
+.year-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+.year-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.year-bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; }
+.year-bar {
+  width: 100%; border-radius: 3px 3px 0 0;
+  background: var(--guinda); transition: height 0.6s ease;
+  min-height: 3px;
+}
+.year-num { font-family: var(--font-head); font-size: 11px; font-weight: 700; color: var(--guinda); }
+.year-lbl { font-size: 9px; color: var(--text3); font-family: var(--font-body); }
+
+/* IF DISTRIBUTION */
+.if-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
+}
+.if-label { font-size: 11px; color: var(--text2); min-width: 80px; font-family: var(--font-body); }
+.if-track { flex: 1; height: 7px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
+.if-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--guinda), var(--guinda-mid)); transition: width 0.6s; }
+.if-count { font-size: 11px; color: var(--text3); min-width: 24px; text-align: right; font-family: var(--font-head); font-weight: 600; }
+
+/* TOP AUTHORS */
+.top-author { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+.ta-rank { font-family: var(--font-head); font-size: 11px; font-weight: 800; color: var(--text3); min-width: 18px; }
+.ta-info { flex: 1; }
+.ta-name { font-size: 12px; font-weight: 600; font-family: var(--font-head); color: var(--guinda); line-height: 1.2; }
+.ta-unit { font-size: 10px; color: var(--text3); }
+.ta-count { font-family: var(--font-head); font-size: 14px; font-weight: 800; color: var(--guinda); }
+
+/* QUARTILE PILLS in pub list */
+.q-pill {
+  font-size: 10px; font-family: var(--font-head); font-weight: 800;
+  padding: 2px 7px; border-radius: 3px; white-space: nowrap;
+}
+.q-pill.Q1 { background: #E8F5EC; color: #1E7D35; border: 1px solid #B8D9BF; }
+.q-pill.Q2 { background: #E8EEF8; color: #1A5A9A; border: 1px solid #B8CCDF; }
+.q-pill.Q3 { background: var(--gold-pale); color: #8B6914; border: 1px solid var(--gold-light); }
+.q-pill.Q4 { background: #F5EDE0; color: #8B5A2B; border: 1px solid #DFC8A8; }
+.q-pill.NI  { background: var(--bg2); color: var(--text3); border: 1px solid var(--border); }
+
+@media (max-width: 1100px) {
+  .metric-grid { grid-template-columns: repeat(3,1fr); }
+  .charts-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 768px) {
+  .metric-grid { grid-template-columns: repeat(2,1fr); }
+  .charts-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 400px) {
+  .metric-grid { grid-template-columns: 1fr 1fr; }
+}
+
+  background: #E8F5EC; border: 1px solid #B8D9BF; border-radius: var(--radius);
+  padding: 12px 14px; margin-top: 10px;
+}
+.cvu-warn {
+  background: var(--gold-pale); border: 1px solid var(--gold-light);
+  border-radius: var(--radius); padding: 12px 14px; margin-top: 10px;
+}
+.cvu-err {
+  background: #FFF0F0; border: 1px solid #F5B7B1;
+  border-radius: var(--radius); padding: 12px 14px; margin-top: 10px;
+}
+
+/* ══════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+  .researcher-grid { grid-template-columns: repeat(2,1fr); }
+  .stat-grid { grid-template-columns: repeat(2,1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    z-index: 200;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .main { margin-left: 0; }
+  .hamburger { display: flex !important; }
+  .topbar { padding: 0 14px; }
+  .section { padding: 18px 14px 32px; }
+  .hero-banner { padding: 24px 20px; }
+  .hero-title { font-size: 24px; }
+  .hero-stats { gap: 20px; }
+  .hero-stat .num { font-size: 24px; }
+  .stat-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
+  .researcher-grid { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal { border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 92vh; }
+  .modal-head { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  #map-container { height: 260px; }
+  #network-container { height: 260px; }
+  .filter-row { gap: 5px; }
+  .fc { font-size: 11px; padding: 5px 10px; }
+  .search-bar { max-width: 100%; }
+  .section-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+  .topbar-right .admin-only { display: none !important; }
+  .notification { left: 14px; right: 14px; bottom: 14px; }
+}
+
+@media (max-width: 400px) {
+  .stat-grid { grid-template-columns: 1fr; }
+  .hero-title { font-size: 20px; }
+  .hero-stats { gap: 14px; flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- Overlay sidebar móvil -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- BARRA GOB.MX -->
+<div class="gov-bar">
+  Gobierno de México — gob.mx &nbsp;|&nbsp; Instituto Politécnico Nacional
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-top">
+      <div class="brand-code">REI06-RSAL · Red de Salud</div>
+      <div class="brand-title">Red de<br>Salud IPN</div>
+      <div class="brand-sub">Creada en 2011 · Gaceta Politécnica No. 887</div>
+    </div>
+    <div class="brand-ipn">
+      <div class="ipn-seal">IPN</div>
+      <div class="ipn-label">
+        <strong>CORIyP</strong>
+        Coordinación de Redes de Investigación y Posgrado
+      </div>
+    </div>
+  </div>
+
+  <div class="sync-status">
+    <div class="sync-dot live" id="sheets-dot"></div>
+    <span id="sheets-status-text">En línea</span>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Inicio</div>
+    <button class="nav-item active" onclick="showSection('dashboard')">
+      <span class="nav-icon">🏠</span> Panel principal
+      <span class="nav-badge" id="nb-r">0</span>
+    </button>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Red de Salud</div>
+    <button class="nav-item" onclick="showSection('researchers')">
+      <span class="nav-icon">👩‍🔬</span> Investigadores
+    </button>
+    <button class="nav-item" onclick="showSection('projects')">
+      <span class="nav-icon">📁</span> Proyectos e iniciativas
+    </button>
+    <button class="nav-item" onclick="showSection('publications')">
+      <span class="nav-icon">📄</span> Publicaciones
+    </button>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Vinculaciones</div>
+    <button class="nav-item" onclick="showSection('network')">
+      <span class="nav-icon">🕸️</span> Mapa de red
+    </button>
+    <button class="nav-item" onclick="showSection('collaborations')">
+      <span class="nav-icon">🌐</span> Colaboraciones
+    </button>
+  </div>
+
+  <div class="nav-divider"></div>
+
+  <div class="nav-group admin-nav">
+    <div class="nav-label">Administración</div>
+    <button class="nav-item" onclick="showSection('admin')">
+      <span class="nav-icon">⚙️</span> Gestión de datos
+    </button>
+    <button class="nav-item" onclick="showSection('cvu')">
+      <span class="nav-icon">📋</span> Cargar CVU
+    </button>
+    <button class="nav-item" onclick="showSection('supabase-setup')">
+      <span class="nav-icon">🔗</span> Configuración BD
+    </button>
+  </div>
+
+  <div class="sidebar-footer">
+    <div>Red de Salud IPN · <span>REI06-RSAL</span></div>
+    <div id="role-display">Consulta pública</div>
+    <div>CORIyP · <span>v1.0 · 2025</span></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-left">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Menú">
+          <span></span><span></span><span></span>
+        </button>
+        <span class="topbar-crumb">Red de Salud</span>
+        <span class="topbar-sep">/</span>
+        <span class="topbar-page" id="topbar-title">Panel principal</span>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-outline btn-sm admin-only" onclick="syncToSupabase()">↺ Sincronizar</button>
+        <button class="btn btn-outline btn-sm admin-only" onclick="openModal('modal-researcher')">+ Investigador</button>
+        <button class="btn btn-guinda btn-sm admin-only" onclick="showSection('cvu')">↑ Cargar CVU</button>
+        <div id="admin-indicator">
+          🔑 Administrador &nbsp;
+          <button onclick="doLogout()" style="background:none;border:none;cursor:pointer;color:var(--gold);font-size:11px;text-decoration:underline;font-family:var(--font-body);">Salir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section class="section active" id="section-dashboard">
+    <div class="hero-banner">
+      <div class="hero-code">Instituto Politécnico Nacional · CORIyP</div>
+      <div class="hero-title">Red de Investigación en Salud</div>
+      <div class="hero-desc">
+        Plataforma de difusión de la Red de Salud del IPN (REI06-RSAL). Promovemos la formación de recursos humanos de excelencia y la generación de conocimientos científicos de frontera aplicados a la mejora de la salud de la sociedad.
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="num" id="hs-r">0</div><div class="lbl">Investigadores activos</div></div>
+        <div class="hero-stat"><div class="num" id="hs-p">0</div><div class="lbl">Proyectos vigentes</div></div>
+        <div class="hero-stat"><div class="num" id="hs-pub">0</div><div class="lbl">Publicaciones</div></div>
+        <div class="hero-stat"><div class="num">5</div><div class="lbl">Líneas de investigación</div></div>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card"><span class="sc-icon">📈</span><div class="sc-num" id="s-active">0</div><div class="sc-lbl">Proyectos activos</div></div>
+      <div class="stat-card"><span class="sc-icon">🏛️</span><div class="sc-num" id="s-units">0</div><div class="sc-lbl">Unidades académicas</div></div>
+      <div class="stat-card"><span class="sc-icon">🤝</span><div class="sc-num">0</div><div class="sc-lbl">Colaboraciones intl.</div></div>
+      <div class="stat-card"><span class="sc-icon">🎓</span><div class="sc-num">0</div><div class="sc-lbl">Programas de posgrado</div></div>
+    </div>
+
+    <!-- ── MÉTRICAS DE PUBLICACIONES ────────────────── -->
+    <div class="metrics-section" id="metrics-section">
+      <div class="metrics-header">
+        <div class="metrics-title">Métricas de publicaciones</div>
+        <span class="metrics-year-badge" id="metrics-year-badge"></span>
+      </div>
+
+      <!-- TARJETAS DE CUARTIL -->
+      <div class="metric-grid">
+        <div class="metric-card total">
+          <div class="metric-num" id="m-total">0</div>
+          <div class="metric-lbl">Este año</div>
+          <div class="metric-sub">artículos publicados</div>
+        </div>
+        <div class="metric-card q1">
+          <span class="metric-badge">Q1</span>
+          <div class="metric-num" id="m-q1">0</div>
+          <div class="metric-lbl">Cuartil 1</div>
+          <div class="metric-sub">revistas top</div>
+        </div>
+        <div class="metric-card q2">
+          <span class="metric-badge">Q2</span>
+          <div class="metric-num" id="m-q2">0</div>
+          <div class="metric-lbl">Cuartil 2</div>
+          <div class="metric-sub">alto impacto</div>
+        </div>
+        <div class="metric-card q3">
+          <span class="metric-badge">Q3</span>
+          <div class="metric-num" id="m-q3">0</div>
+          <div class="metric-lbl">Cuartil 3</div>
+          <div class="metric-sub">impacto medio</div>
+        </div>
+        <div class="metric-card q4">
+          <span class="metric-badge">Q4</span>
+          <div class="metric-num" id="m-q4">0</div>
+          <div class="metric-lbl">Cuartil 4</div>
+          <div class="metric-sub"></div>
+        </div>
+        <div class="metric-card ni">
+          <div class="metric-num" id="m-ni">0</div>
+          <div class="metric-lbl">Sin índice</div>
+          <div class="metric-sub">o no clasificadas</div>
+        </div>
+      </div>
+
+      <!-- GRÁFICAS -->
+      <div class="charts-row">
+        <!-- Distribución por cuartil -->
+        <div class="chart-card">
+          <div class="chart-title">Distribución por cuartil · este año</div>
+          <div id="quartile-bars">
+            <div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>
+          </div>
+        </div>
+
+        <!-- Publicaciones por año -->
+        <div class="chart-card">
+          <div class="chart-title">Publicaciones por año (últimos 5)</div>
+          <div id="year-chart-wrap">
+            <div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>
+          </div>
+        </div>
+
+        <!-- Factor de impacto / Top autores -->
+        <div class="chart-card">
+          <div class="chart-title">Investigadores más productivos</div>
+          <div id="top-authors-wrap">
+            <div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Proyectos recientes</h3><button class="btn btn-outline btn-sm" onclick="showSection('projects')">Ver todos</button></div>
+        <div class="card-body" id="dash-projects">
+          <div class="empty-state"><div class="empty-icon">📁</div><div class="empty-desc">Sin proyectos registrados aún.</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Investigadores de la red</h3><button class="btn btn-outline btn-sm" onclick="showSection('researchers')">Ver todos</button></div>
+        <div class="card-body" id="dash-researchers">
+          <div class="empty-state"><div class="empty-icon">👩‍🔬</div><div class="empty-desc">Sin investigadores registrados aún.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INVESTIGADORES -->
+  <section class="section" id="section-researchers">
+    <div class="section-header">
+      <div class="sh-left">
+        <div class="sh-eyebrow">Red de Salud IPN · REI06-RSAL</div>
+        <div class="sh-title">Investigadores</div>
+      </div>
+      <div class="sh-actions admin-only">
+        <button class="btn btn-outline btn-sm" onclick="showSection('cvu')">📋 Cargar CVU</button>
+        <button class="btn btn-guinda btn-sm" onclick="openModal('modal-researcher')">+ Nuevo</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <input type="text" class="search-bar" placeholder="Buscar investigador, área, unidad…" oninput="filterResearchers(this.value)">
+      <button class="fc active" onclick="filterByArea('all',this)">Todos</button>
+      <button class="fc" onclick="filterByArea('Salud Pública',this)">Salud Pública</button>
+      <button class="fc" onclick="filterByArea('Clínica',this)">Clínica</button>
+      <button class="fc" onclick="filterByArea('Básica',this)">Básica</button>
+      <button class="fc" onclick="filterByArea('Epidemiología',this)">Epidemiología</button>
+      <button class="fc" onclick="filterByArea('Nutrición',this)">Nutrición</button>
+    </div>
+    <div class="researcher-grid" id="researcher-grid">
+      <div class="empty-state" style="grid-column:1/-1;">
+        <div class="empty-icon">👩‍🔬</div>
+        <div class="empty-title">Sin investigadores registrados</div>
+        <div class="empty-desc">Carga el CVU de Rizoma de cada investigador para poblar esta sección.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROYECTOS -->
+  <section class="section" id="section-projects">
+    <div class="section-header">
+      <div class="sh-left">
+        <div class="sh-eyebrow">Investigación en curso</div>
+        <div class="sh-title">Proyectos e Iniciativas</div>
+      </div>
+      <button class="btn btn-guinda btn-sm admin-only" onclick="openModal('modal-project')">+ Nuevo proyecto</button>
+    </div>
+    <div class="filter-row">
+      <button class="fc active" onclick="filterProjects('all',this)">Todos</button>
+      <button class="fc" onclick="filterProjects('Activo',this)">Activos</button>
+      <button class="fc" onclick="filterProjects('En revisión',this)">En revisión</button>
+      <button class="fc" onclick="filterProjects('Concluido',this)">Concluidos</button>
+    </div>
+    <div id="project-list">
+      <div class="empty-state"><div class="empty-icon">📁</div><div class="empty-title">Sin proyectos registrados</div><div class="empty-desc">Agrega los proyectos vigentes de la red.</div></div>
+    </div>
+  </section>
+
+  <!-- PUBLICACIONES -->
+  <section class="section" id="section-publications">
+    <div class="section-header">
+      <div class="sh-left">
+        <div class="sh-eyebrow">Producción científica</div>
+        <div class="sh-title">Publicaciones</div>
+      </div>
+      <button class="btn btn-guinda btn-sm admin-only" onclick="openModal('modal-publication')">+ Nueva</button>
+    </div>
+    <div class="filter-row">
+      <input type="text" class="search-bar" placeholder="Buscar por título, autor, revista…" oninput="filterPublications(this.value)">
+      <button class="fc active" onclick="filterPubType('all',this)">Todas</button>
+      <button class="fc" onclick="filterPubType('Artículo',this)">Artículos</button>
+      <button class="fc" onclick="filterPubType('Capítulo',this)">Capítulos</button>
+      <button class="fc" onclick="filterPubType('Congreso',this)">Congresos</button>
+    </div>
+    <div id="pub-list">
+      <div class="empty-state"><div class="empty-icon">📄</div><div class="empty-title">Sin publicaciones registradas</div><div class="empty-desc">Las publicaciones se cargan automáticamente desde ORCID al agregar investigadores.</div></div>
+    </div>
+  </section>
+
+  <!-- MAPA DE RED -->
+  <section class="section" id="section-network">
+    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Interconexiones</div><div class="sh-title">Mapa de Red</div></div></div>
+    <div class="card">
+      <div class="card-body">
+        <div id="network-container"><canvas id="netCanvas" style="width:100%;height:100%;"></canvas></div>
+        <div class="map-legend mt-16">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);"></div>Investigador IPN</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1E7D35;"></div>Colaborador nacional</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--gold);"></div>Colaborador internacional</div>
+        </div>
+        <p style="font-size:11.5px;color:var(--text3);margin-top:7px;">El mapa se genera automáticamente conforme se agregan investigadores a la red.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- COLABORACIONES -->
+  <section class="section" id="section-collaborations">
+    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Vinculaciones y alianzas</div><div class="sh-title">Colaboraciones</div></div></div>
+    <div class="card mt-16" style="margin-bottom:20px;">
+      <div class="card-body">
+        <div id="map-container"><svg id="world-map" style="width:100%;height:100%;" viewBox="0 0 900 450"></svg></div>
+        <div class="map-legend mt-16">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);width:12px;height:12px;"></div>Sede IPN</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1E7D35;"></div>Colaborador nacional</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--gold);"></div>Colaborador internacional</div>
+        </div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><div class="card-header"><h3>🇲🇽 Colaboraciones Nacionales</h3></div><div class="card-body" id="national-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Sin colaboraciones registradas.</div></div></div></div>
+      <div class="card"><div class="card-header"><h3>🌍 Colaboraciones Internacionales</h3></div><div class="card-body" id="international-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Sin colaboraciones registradas.</div></div></div></div>
+    </div>
+  </section>
+
+  <!-- ADMINISTRACIÓN -->
+  <section class="section" id="section-admin">
+    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Panel de control</div><div class="sh-title">Gestión de datos</div></div></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Investigadores registrados</h3></div>
+        <div class="card-body">
+          <table class="data-table"><thead><tr><th>Nombre</th><th>Área</th><th>Unidad</th><th>CVU</th><th></th></tr></thead><tbody id="admin-r-body"><tr><td colspan="5" style="text-align:center;color:var(--text3);font-style:italic;padding:20px;">Sin registros</td></tr></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Proyectos registrados</h3></div>
+        <div class="card-body">
+          <table class="data-table"><thead><tr><th>Título</th><th>Estado</th><th></th></tr></thead><tbody id="admin-p-body"><tr><td colspan="3" style="text-align:center;color:var(--text3);font-style:italic;padding:20px;">Sin registros</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="card mt-20">
+      <div class="card-header"><h3>Exportar datos</h3></div>
+      <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="exportJSON()">⬇ JSON completo</button>
+        <button class="btn btn-outline" onclick="exportCSV()">⬇ CSV investigadores</button>
+        <button class="btn btn-outline" onclick="exportCSVProjects()">⬇ CSV proyectos</button>
+        <button class="btn btn-gold" onclick="syncToSupabase()">☁️ Forzar sincronía</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARGAR CVU -->
+  <section class="section" id="section-cvu">
+    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Incorporar investigador</div><div class="sh-title">Cargar CVU de Rizoma</div></div></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Subir PDF — Perfil Único Secihti</h3></div>
+        <div class="card-body">
+          <div class="dropzone" onclick="document.getElementById('cvu-file-input').click()" ondragover="event.preventDefault();this.style.borderColor='var(--guinda)'" ondragleave="this.style.borderColor=''" ondrop="handleCVUDrop(event)">
+            <div class="dropzone-icon">📄</div>
+            <div class="dropzone-title">Arrastra el PDF del CVU aquí</div>
+            <div class="dropzone-sub">o clic para seleccionar · Perfil Único Rizoma / Secihti</div>
+          </div>
+          <input type="file" id="cvu-file-input" accept=".pdf" style="display:none" onchange="handleCVUFile(this)">
+          <div id="cvu-file-display" style="margin-top:10px;"></div>
+          <div id="cvu-result-area"></div>
+          <div style="margin-top:14px;">
+            <label style="font-size:11px;font-family:var(--font-head);font-weight:700;color:var(--guinda);text-transform:uppercase;letter-spacing:0.5px;">URL Rizoma (opcional)</label>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <input type="url" id="cvu-url" placeholder="https://rizoma.conacyt.mx/cvu/…" style="flex:1;padding:8px 11px;border:1px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font-body);background:var(--white);color:var(--text);outline:none;">
+              <button class="btn btn-guinda" onclick="processCVUURL()">Cargar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Datos extraídos / Captura manual</h3></div>
+        <div class="card-body">
+          <div class="form-row"><div class="fg"><label>Nombre completo *</label><input type="text" id="cvu-name" placeholder="Dr. Nombre Apellidos"></div><div class="fg"><label>No. CVU</label><input type="text" id="cvu-number" placeholder="559655"></div></div>
+          <div class="form-row"><div class="fg"><label>Institución</label><input type="text" id="cvu-institution" placeholder="ESM, ENCB, CIIDIR…"></div><div class="fg"><label>Unidad académica</label><input type="text" id="cvu-unit" placeholder="ESM, ENCB, CBG…"></div></div>
+          <div class="form-row"><div class="fg"><label>ORCID</label><input type="text" id="cvu-orcid" placeholder="0000-0000-0000-0000"></div><div class="fg"><label>Nivel SNI</label><select id="cvu-sni"><option>Candidato</option><option>Nivel I</option><option>Nivel II</option><option>Nivel III</option><option>Emérito</option><option>No aplica</option></select></div></div>
+          <div class="form-row"><div class="fg"><label>Área de investigación</label><select id="cvu-area"><option>Salud Pública</option><option>Clínica</option><option>Básica</option><option>Epidemiología</option><option>Nutrición</option><option>Conducta</option><option>Otra</option></select></div><div class="fg"><label>Email institucional</label><input type="email" id="cvu-email" placeholder="investigador@ipn.mx"></div></div>
+          <div class="form-row full"><div class="fg"><label>Líneas de investigación (coma)</label><input type="text" id="cvu-lines" placeholder="Farmacología, Metabolismo, Oncología…"></div></div>
+          <div class="form-row full"><div class="fg"><label>Semblanza académica</label><textarea id="cvu-bio" placeholder="Trayectoria, grados, producción…"></textarea></div></div>
+          <button class="btn btn-guinda" style="width:100%" onclick="saveCVUResearcher()">✓ Guardar investigador en la Red</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GOOGLE SHEETS -->
+  <section class="section" id="section-sheets-setup">
+    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Sincronización automática</div><div class="sh-title">Google Sheets</div></div></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Instrucciones de configuración</h3></div>
+        <div class="card-body" style="line-height:1.8;">
+          <div style="margin-bottom:12px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
+            <strong style="font-family:var(--font-head);font-size:12px;color:var(--guinda);">PASO 1.</strong>
+            <span style="font-size:13px;color:var(--text2);"> Crea un Google Sheet llamado <em>"Red de Salud IPN"</em> con 3 hojas: <strong>Investigadores</strong>, <strong>Proyectos</strong>, <strong>Publicaciones</strong>.</span>
+          </div>
+          <div style="margin-bottom:12px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
+            <strong style="font-family:var(--font-head);font-size:12px;color:var(--guinda);">PASO 2.</strong>
+            <span style="font-size:13px;color:var(--text2);"> Ve a <em>Extensiones → Apps Script</em>. Pega el código de abajo. Haz clic en <em>Implementar → Nueva implementación → Aplicación web → Cualquier persona</em>.</span>
+          </div>
+          <div style="margin-bottom:12px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
+            <strong style="font-family:var(--font-head);font-size:12px;color:var(--guinda);">PASO 3.</strong>
+            <span style="font-size:13px;color:var(--text2);"> Copia la URL generada y pégala a la derecha. La sincronización será automática cada 60 segundos.</span>
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-family:monospace;font-size:10px;color:var(--text2);overflow:auto;max-height:160px;" id="apps-script-code"></div>
+          <button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="copyAppsScript()">📋 Copiar código Apps Script</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Conectar con Google Sheets</h3></div>
+        <div class="card-body">
+          <div class="fg" style="margin-bottom:12px;"><label>URL de Apps Script</label><input type="url" id="sheets-url-input" placeholder="https://script.google.com/macros/s/…/exec"></div>
+          <button class="btn btn-guinda" style="width:100%;margin-bottom:12px;" onclick="saveSupabaseConfig()">✓ Guardar y probar conexión</button>
+          <div id="sheets-test-result"></div>
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+            <div style="font-size:10.5px;font-family:var(--font-head);font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:7px;">URL configurada</div>
+            <div id="current-sheets-url" style="font-size:11px;color:var(--text2);word-break:break-all;background:var(--bg);padding:10px;border-radius:var(--radius);border:1px solid var(--border);font-family:monospace;"></div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+              <button class="btn btn-outline btn-sm" onclick="syncToSupabase()">↺ Recargar datos</button>
+              <button class="btn btn-gold btn-sm" onclick="syncToSupabase()">✓ Forzar actualización</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══ MODALES ══════════════════════════════════════════════ -->
+
+<!-- Nuevo investigador -->
+<div class="modal-overlay" id="modal-researcher">
+  <div class="modal">
+    <div class="modal-head"><button class="modal-close" onclick="closeModal('modal-researcher')">✕</button><h2>Nuevo Investigador</h2><p>Registrar miembro de la Red de Salud IPN</p></div>
+    <div class="modal-body">
+      <div class="form-row"><div class="fg"><label>Nombre completo *</label><input type="text" id="r-name" placeholder="Dra. Nombre Apellido Apellido"></div><div class="fg"><label>Unidad académica</label><input type="text" id="r-unit" placeholder="ESM, ENCB, CBG…"></div></div>
+      <div class="form-row"><div class="fg"><label>Institución</label><input type="text" id="r-inst" placeholder="IPN – Escuela Superior de Medicina"></div><div class="fg"><label>Nivel SNI</label><select id="r-sni"><option>Candidato</option><option>Nivel I</option><option>Nivel II</option><option>Nivel III</option><option>Emérito</option><option>No aplica</option></select></div></div>
+      <div class="form-row"><div class="fg"><label>ORCID</label><input type="text" id="r-orcid" placeholder="0000-0000-0000-0000"></div><div class="fg"><label>No. CVU Rizoma</label><input type="text" id="r-cvu" placeholder="Ej: 559655"></div></div>
+      <div class="form-row"><div class="fg"><label>Área de investigación</label><select id="r-area"><option>Salud Pública</option><option>Clínica</option><option>Básica</option><option>Epidemiología</option><option>Nutrición</option><option>Conducta</option><option>Otra</option></select></div><div class="fg"><label>Email institucional</label><input type="email" id="r-email" placeholder="investigador@ipn.mx"></div></div>
+      <div class="form-row full"><div class="fg"><label>Líneas de investigación (separadas por coma)</label><input type="text" id="r-lines" placeholder="Enfermedades crónicas, Farmacología…"></div></div>
+      <div class="form-row full"><div class="fg"><label>Semblanza académica</label><textarea id="r-bio" placeholder="Trayectoria, grados obtenidos, área de especialidad…"></textarea></div></div>
+      <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:8px;">
+        <button class="btn btn-outline" onclick="closeModal('modal-researcher')">Cancelar</button>
+        <button class="btn btn-guinda" onclick="addResearcher()">Guardar investigador</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Nuevo proyecto -->
+<div class="modal-overlay" id="modal-project">
+  <div class="modal">
+    <div class="modal-head"><button class="modal-close" onclick="closeModal('modal-project')">✕</button><h2>Nuevo Proyecto</h2><p>Registrar proyecto de investigación de la Red</p></div>
+    <div class="modal-body">
+      <div class="form-row full"><div class="fg"><label>Título del proyecto *</label><input type="text" id="p-title" placeholder="Nombre completo del proyecto"></div></div>
+      <div class="form-row"><div class="fg"><label>Estado</label><select id="p-status"><option>Activo</option><option>En revisión</option><option>Concluido</option></select></div><div class="fg"><label>Financiamiento</label><select id="p-funding"><option>CONAHCYT</option><option>Institucional IPN</option><option>Internacional</option><option>Mixto</option><option>SIP</option><option>Sin financiamiento</option></select></div></div>
+      <div class="form-row"><div class="fg"><label>Fecha de inicio</label><input type="date" id="p-start"></div><div class="fg"><label>Fecha de término (est.)</label><input type="date" id="p-end"></div></div>
+      <div class="form-row full"><div class="fg"><label>Investigador responsable *</label><input type="text" id="p-lead" placeholder="Nombre del responsable"></div></div>
+      <div class="form-row full"><div class="fg"><label>Colaboradores (separados por coma)</label><input type="text" id="p-collabs" placeholder="Dr. García, Dra. López…"></div></div>
+      <div class="form-row full"><div class="fg"><label>Descripción del proyecto</label><textarea id="p-desc" placeholder="Objetivos, metodología, impacto esperado…"></textarea></div></div>
+      <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:8px;">
+        <button class="btn btn-outline" onclick="closeModal('modal-project')">Cancelar</button>
+        <button class="btn btn-guinda" onclick="addProject()">Guardar proyecto</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Nueva publicación -->
+<div class="modal-overlay" id="modal-publication">
+  <div class="modal">
+    <div class="modal-head"><button class="modal-close" onclick="closeModal('modal-publication')">✕</button><h2>Nueva Publicación</h2><p>Registrar publicación de la red</p></div>
+    <div class="modal-body">
+      <div class="form-row full"><div class="fg"><label>Título *</label><input type="text" id="pub-title" placeholder="Título completo de la publicación"></div></div>
+      <div class="form-row"><div class="fg"><label>Tipo</label><select id="pub-type"><option>Artículo</option><option>Capítulo</option><option>Congreso</option><option>Libro</option></select></div><div class="fg"><label>Año</label><input type="number" id="pub-year" placeholder="2025" min="1990" max="2030"></div></div>
+      <div class="form-row full"><div class="fg"><label>Autores</label><input type="text" id="pub-authors" placeholder="Apellido N, Apellido N, et al."></div></div>
+      <div class="form-row full"><div class="fg"><label>Revista / Editorial</label><input type="text" id="pub-journal" placeholder="Nombre de la revista o editorial"></div></div>
+      <div class="form-row"><div class="fg"><label>DOI</label><input type="text" id="pub-doi" placeholder="10.xxxx/…"></div><div class="fg"><label>Factor de impacto</label><input type="text" id="pub-if" placeholder="Ej: 4.2"></div></div>
+      <div class="form-row"><div class="fg"><label>Cuartil (Scimago / JCR)</label><select id="pub-quartile"><option value="">Sin clasificar</option><option value="Q1">Q1 — Primer cuartil</option><option value="Q2">Q2 — Segundo cuartil</option><option value="Q3">Q3 — Tercer cuartil</option><option value="Q4">Q4 — Cuarto cuartil</option><option value="NI">NI — No indexada</option></select></div><div class="fg"><label>ISSN</label><input type="text" id="pub-issn" placeholder="XXXX-XXXX"></div></div>
+      <div class="form-row full"><div class="fg"><label>URL del artículo</label><input type="url" id="pub-url" placeholder="https://doi.org/…"></div></div>
+      <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:8px;">
+        <button class="btn btn-outline" onclick="closeModal('modal-publication')">Cancelar</button>
+        <button class="btn btn-guinda" onclick="addPublication()">Guardar publicación</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detalle investigador -->
+<div class="modal-overlay" id="modal-researcher-detail">
+  <div class="modal" style="max-width:820px;">
+    <div class="modal-head"><button class="modal-close" onclick="closeModal('modal-researcher-detail')">✕</button><h2 id="detail-name"></h2><p id="detail-dept"></p></div>
+    <div class="modal-body">
+      <div class="modal-tabs">
+        <button class="m-tab active" onclick="switchMTab('info')">Información</button>
+        <button class="m-tab" onclick="switchMTab('pubs-tab')">Publicaciones ORCID</button>
+        <button class="m-tab" onclick="switchMTab('platforms')">Plataformas</button>
+      </div>
+      <div class="m-tab-content active" id="modal-tab-info"><div id="detail-info-content"></div></div>
+      <div class="m-tab-content" id="modal-tab-pubs-tab"><div id="detail-pubs-content"></div></div>
+      <div class="m-tab-content" id="modal-tab-platforms"><div id="detail-platforms-content"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Login -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-seal">IPN</div>
+      <div>
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--guinda);">Red de Salud IPN</div>
+        <div style="font-size:11px;color:var(--text3);">REI06-RSAL · Acceso administrativo</div>
+      </div>
+    </div>
+    <h3>Acceso a Administración</h3>
+    <p>Ingresa con el correo y contraseña de tu cuenta de administrador.</p>
+    <input type="email" id="login-email" placeholder="correo@gmail.com" onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+    <input type="password" id="login-password" placeholder="Contraseña…" onkeydown="if(event.key==='Enter')doLogin()" style="margin-top:0;">
+    <div class="login-error" id="login-error">Correo o contraseña incorrectos.</div>
+    <div id="login-loading" style="display:none;font-size:12px;color:var(--guinda);margin-bottom:8px;font-family:var(--font-body);">🔄 Verificando credenciales…</div>
+    <button class="btn btn-guinda" onclick="doLogin()">Ingresar →</button>
+    <button class="btn btn-outline" style="width:100%;margin-top:8px;" onclick="closeLogin()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Notificación -->
+<div class="notification" id="notification"><span id="notification-text"></span></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// SUPABASE — CONFIGURACIÓN Y BACKEND
+// Usa la clave pública (anon key) — es seguro exponerla
+// La seguridad real está en las políticas RLS de Supabase
+// ═══════════════════════════════════════════════════════════
+let SUPABASE_URL = localStorage.getItem('sb_url') || '';
+let SUPABASE_KEY = localStorage.getItem('sb_key') || '';
+let db = null;
+let isAdmin = false;
+let currentUser = null;
+let realtimeChannel = null;
+
+// ── INICIALIZAR SUPABASE ────────────────────────────────────
+async function initSupabase() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    setSyncStatus('warning', 'Sin configurar');
+    updateCurrentUrl();
+    return;
+  }
+  try {
+    const { createClient } = window.supabase;
+    db = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true }
+    });
+    // Verificar sesión existente (admin que ya había iniciado sesión)
+    const { data: { session } } = await db.auth.getSession();
+    if (session) {
+      isAdmin = true;
+      currentUser = session.user;
+      activateAdminUI();
+    }
+    // Cargar datos públicos
+    await loadAllData();
+    // Suscribir a cambios en tiempo real
+    subscribeRealtime();
+    setSyncStatus('connected', 'Conectado · Tiempo real activo');
+  } catch(e) {
+    setSyncStatus('error', 'Error de conexión');
+    console.error('Supabase init:', e);
+  }
+}
+
+// ── CARGAR TODOS LOS DATOS ──────────────────────────────────
+async function loadAllData() {
+  if (!db) return;
+  setSyncStatus('loading', 'Cargando datos…');
+  try {
+    await Promise.all([
+      loadResearchers(),
+      loadProjects(),
+      loadPublications(),
+      loadCollaborations()
+    ]);
+    setSyncStatus('connected', 'Sincronizado');
+  } catch(e) {
+    setSyncStatus('error', 'Error al cargar datos');
+    console.error('loadAllData:', e);
+  }
+}
+
+async function loadResearchers() {
+  const { data, error } = await db.from('researchers').select('*').order('name');
+  if (error) { console.error('loadResearchers:', error); return; }
+  appData.researchers = (data||[]).map(r => ({
+    ...r,
+    lines: Array.isArray(r.lines) ? r.lines : [],
+    pubs: r.pubs || 0
+  }));
+}
+
+async function loadProjects() {
+  const { data, error } = await db.from('projects').select('*').order('created_at', { ascending: false });
+  if (error) { console.error('loadProjects:', error); return; }
+  appData.projects = (data||[]).map(p => ({
+    ...p,
+    collabs: Array.isArray(p.collabs) ? p.collabs : [],
+    start: p.start_date || '',
+    end: p.end_date || '',
+    desc: p.description || ''
+  }));
+}
+
+async function loadPublications() {
+  const { data, error } = await db.from('publications').select('*').order('year', { ascending: false });
+  if (error) { console.error('loadPublications:', error); return; }
+  appData.publications = (data||[]).map(p => ({
+    ...p,
+    if: p.impact_factor || ''
+  }));
+}
+
+async function loadCollaborations() {
+  const { data, error } = await db.from('collaborations').select('*');
+  if (error) { console.error('loadCollaborations:', error); return; }
+  const nat  = (data||[]).filter(c => c.type === 'national');
+  const intl = (data||[]).filter(c => c.type === 'international');
+  appData.collaborations = { national: nat, international: intl };
+}
+
+// ── TIEMPO REAL — cambios aparecen instantáneamente ────────
+function subscribeRealtime() {
+  if (realtimeChannel) { db.removeChannel(realtimeChannel); }
+  realtimeChannel = db.channel('red-salud-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'researchers' }, async () => {
+      await loadResearchers();
+      refreshActiveView();
+      setSyncStatus('connected', 'Actualizado en tiempo real ✓');
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, async () => {
+      await loadProjects();
+      refreshActiveView();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'publications' }, async () => {
+      await loadPublications();
+      refreshActiveView();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborations' }, async () => {
+      await loadCollaborations();
+      refreshActiveView();
+    })
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') setSyncStatus('connected', 'Tiempo real activo');
+      if (status === 'CLOSED') setSyncStatus('warning', 'Conexión cerrada');
+    });
+}
+
+function refreshActiveView() {
+  const active = document.querySelector('.section.active');
+  if (!active) return;
+  const id = active.id.replace('section-','');
+  if (id==='dashboard') { renderDashboard(); renderMetrics(); }
+  if (id==='researchers') renderResearchers();
+  if (id==='projects') renderProjects();
+  if (id==='publications') renderPublications();
+  if (id==='network') renderNetwork();
+  if (id==='collaborations') renderCollaborations();
+}
+
+// ── CRUD — Investigadores ───────────────────────────────────
+async function saveResearcher(data) {
+  if (!isAdmin || !db) { openLogin(); return null; }
+  const record = {
+    name: data.name, dept: data.dept, unit: data.unit, inst: data.inst,
+    area: data.area, area_completa: data.areaCompleta||'',
+    disciplina: data.disciplina||'', subdisciplina: data.subdisciplina||'',
+    sni: data.sni, orcid: data.orcid||'', cvu: data.cvu||'',
+    email: data.email||'', bio: data.bio||'',
+    lines: Array.isArray(data.lines) ? data.lines : [],
+    pubs: parseInt(data.pubs)||0,
+    rizoma: data.rizoma||'https://rizoma.conacyt.mx/'
+  };
+  // Actualizar si ya existe por nombre, insertar si es nuevo
+  const existing = appData.researchers.find(r => r.name.toLowerCase() === data.name.toLowerCase());
+  if (existing && existing.id) {
+    const { error } = await db.from('researchers').update(record).eq('id', existing.id);
+    if (error) { notify('✕ Error al actualizar: ' + error.message); return null; }
+    notify('✓ Perfil actualizado: ' + data.name);
+  } else {
+    const { error } = await db.from('researchers').insert(record);
+    if (error) { notify('✕ Error al guardar: ' + error.message); return null; }
+    notify('✓ Investigador agregado a la Red');
+  }
+  return true;
+}
+
+async function deleteResearcherDB(id) {
+  if (!isAdmin || !db) return;
+  if (!confirm('¿Eliminar este investigador permanentemente?')) return;
+  const { error } = await db.from('researchers').delete().eq('id', id);
+  if (error) notify('✕ Error: ' + error.message);
+  else { notify('Investigador eliminado'); appData.researchers = appData.researchers.filter(r=>r.id!==id); renderAdmin(); }
+}
+
+// ── CRUD — Proyectos ────────────────────────────────────────
+async function saveProject(data) {
+  if (!isAdmin || !db) { openLogin(); return null; }
+  const record = {
+    title: data.title, status: data.status, funding: data.funding,
+    start_date: data.start||'', end_date: data.end||'', lead: data.lead,
+    collabs: Array.isArray(data.collabs) ? data.collabs : [],
+    description: data.desc||'', type: data.type||'Investigación'
+  };
+  const { error } = await db.from('projects').insert(record);
+  if (error) { notify('✕ Error: ' + error.message); return null; }
+  notify('✓ Proyecto registrado');
+  return true;
+}
+
+async function deleteProjectDB(id) {
+  if (!isAdmin || !db) return;
+  if (!confirm('¿Eliminar este proyecto permanentemente?')) return;
+  const { error } = await db.from('projects').delete().eq('id', id);
+  if (error) notify('✕ Error: ' + error.message);
+  else { notify('Proyecto eliminado'); appData.projects = appData.projects.filter(p=>p.id!==id); renderAdmin(); }
+}
+
+// ── CRUD — Publicaciones ────────────────────────────────────
+async function savePublication(data) {
+  if (!isAdmin || !db) { openLogin(); return null; }
+  const record = {
+    title: data.title, type: data.type,
+    year: parseInt(data.year)||new Date().getFullYear(),
+    authors: data.authors||'', journal: data.journal||'',
+    doi: data.doi||'', impact_factor: data.if||'',
+    quartile: data.quartile||'', issn: data.issn||'', url: data.url||''
+  };
+  const { error } = await db.from('publications').insert(record);
+  if (error) { notify('✕ Error: ' + error.message); return null; }
+  notify('✓ Publicación registrada');
+  return true;
+}
+
+// ── AUTH — Login/Logout con Supabase ────────────────────────
+async function doLogin() {
+  if (!db) { notify('Configura Supabase primero'); showSection('supabase-setup'); return; }
+  const email    = (document.getElementById('login-email')?.value || '').trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { document.getElementById('login-error').textContent='Ingresa correo y contraseña.'; document.getElementById('login-error').style.display='block'; return; }
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-loading').style.display = 'block';
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    document.getElementById('login-loading').style.display = 'none';
+    if (error) {
+      document.getElementById('login-error').textContent = 'Correo o contraseña incorrectos.';
+      document.getElementById('login-error').style.display = 'block';
+      document.getElementById('login-password').value = '';
+      return;
+    }
+    isAdmin = true;
+    currentUser = data.user;
+    closeLogin();
+    activateAdminUI();
+    notify('✓ Bienvenido/a, ' + (data.user.email||'administrador'));
+    renderDashboard();
+  } catch(e) {
+    document.getElementById('login-loading').style.display = 'none';
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+
+async function doLogout() {
+  if (db) await db.auth.signOut();
+  isAdmin = false;
+  currentUser = null;
+  document.body.classList.remove('is-admin');
+  document.getElementById('admin-indicator').style.display = 'none';
+  document.getElementById('role-display').textContent = 'Consulta pública';
+  const adminIds = ['admin','cvu','supabase-setup'];
+  if (adminIds.some(s => sectionTitles[s] === document.getElementById('topbar-title').textContent)) showSection('dashboard');
+  notify('Sesión de administrador cerrada');
+}
+
+function activateAdminUI() {
+  document.body.classList.add('is-admin');
+  document.getElementById('admin-indicator').style.display = 'flex';
+  document.getElementById('role-display').textContent = 'Administrador · ' + (currentUser?.email||'');
+}
+
+// ── CONFIG Supabase ─────────────────────────────────────────
+function saveSupabaseConfig() {
+  const url = document.getElementById('sb-url-input').value.trim();
+  const key = document.getElementById('sb-key-input').value.trim();
+  if (!url || !key) { alert('Ingresa la URL y la clave anon'); return; }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  SUPABASE_URL = url; SUPABASE_KEY = key;
+  updateCurrentUrl();
+  const res = document.getElementById('sb-test-result');
+  res.innerHTML = '<div class="cvu-warn" style="font-size:13px;">🔄 Conectando con Supabase…</div>';
+  initSupabase().then(() => {
+    res.innerHTML = db
+      ? '<div class="cvu-ok" style="font-size:13px;">✓ Conectado. Los datos se cargarán en tiempo real. Usa <strong>Ctrl+Shift+A</strong> para iniciar sesión como administrador.</div>'
+      : '<div class="cvu-err" style="font-size:13px;">✕ No se pudo conectar. Verifica la URL y la clave.</div>';
+    if (db) renderDashboard();
+  });
+}
+
+function clearSupabaseConfig() {
+  if (!confirm('¿Limpiar la configuración de Supabase?')) return;
+  localStorage.removeItem('sb_url'); localStorage.removeItem('sb_key');
+  SUPABASE_URL = ''; SUPABASE_KEY = ''; db = null;
+  updateCurrentUrl();
+  document.getElementById('sb-url-input').value = '';
+  document.getElementById('sb-key-input').value = '';
+  setSyncStatus('warning', 'Sin configurar');
+  notify('Configuración limpiada');
+}
+
+function updateCurrentUrl() {
+  const el = document.getElementById('sb-current-url');
+  if (el) el.textContent = SUPABASE_URL || 'No configurada aún';
+  if (SUPABASE_URL) {
+    document.getElementById('sb-url-input').value = SUPABASE_URL;
+    document.getElementById('sb-key-input').value = SUPABASE_KEY;
+  }
+}
+
+async function syncToSupabase() {
+  if (!db) { notify('Supabase no configurado'); return; }
+  await loadAllData();
+  refreshActiveView();
+  notify('✓ Datos actualizados desde Supabase');
+}
+
+// ── ESTADO DE SYNC ──────────────────────────────────────────
+function setSyncStatus(state, text) {
+  const dot = document.getElementById('sheets-dot');
+  const lbl = document.getElementById('sheets-status-text');
+  if (!dot || !lbl) return;
+  dot.style.animation = '';
+  if (state === 'connected') { dot.style.background = '#1E7D35'; dot.style.animation = 'blink 2.5s infinite'; }
+  if (state === 'loading')   { dot.style.background = 'var(--gold)'; dot.style.animation = 'blink 1s infinite'; }
+  if (state === 'error')     { dot.style.background = '#C0392B'; }
+  if (state === 'warning')   { dot.style.background = 'var(--gold)'; }
+  lbl.textContent = text;
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+(async function init(){
+  renderDashboard();
+  // Polling automático cada 60 segundos
+  // Supabase Realtime activo — no necesita polling
+  // Acceso admin por URL
+  if(window.location.search.includes('admin')) setTimeout(openLogin, 500);
+})();
+</script>
+</body>
+</html>
