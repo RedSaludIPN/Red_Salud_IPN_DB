@@ -1429,6 +1429,86 @@ body {
 
 <script>
 // ═══════════════════════════════════════════════════════════
+// NAVEGACIÓN Y CONTROL DE ACCESO
+// ═══════════════════════════════════════════════════════════
+const sectionTitles = {
+  dashboard: 'Panel principal', researchers: 'Investigadores',
+  projects: 'Proyectos e iniciativas', publications: 'Publicaciones',
+  network: 'Mapa de red', collaborations: 'Colaboraciones',
+  admin: 'Gestión de datos', cvu: 'Cargar CVU', 'supabase-setup': 'Configuración BD'
+};
+
+function showSection(id) {
+  const adminOnly = ['admin','cvu','supabase-setup'];
+  // Excepción: Configuración BD es accesible sin login si Supabase aún no está configurado
+  // (necesario para la primera configuración — problema "huevo y gallina")
+  const firstTimeSetup = (id === 'supabase-setup' && !db);
+  if (adminOnly.includes(id) && !isAdmin && !firstTimeSetup) { openLogin(); return; }
+  if (window.innerWidth <= 768) closeSidebar();
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + id)?.classList.add('active');
+  document.getElementById('topbar-title').textContent = sectionTitles[id] || id;
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick')?.includes("'" + id + "'")) n.classList.add('active');
+  });
+  if (id === 'dashboard') { renderDashboard(); renderMetrics(); }
+  if (id === 'researchers') renderResearchers();
+  if (id === 'projects') renderProjects();
+  if (id === 'publications') renderPublications();
+  if (id === 'network') setTimeout(renderNetwork, 120);
+  if (id === 'collaborations') renderCollaborations();
+  if (id === 'admin') renderAdmin();
+}
+
+function switchMTab(tab) {
+  document.querySelectorAll('.m-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.m-tab-content').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('modal-tab-' + tab).classList.add('active');
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+// ── LOGIN / MODALES ─────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) { e.preventDefault(); isAdmin ? doLogout() : openLogin(); }
+  if (e.key === 'Escape') closeLogin();
+});
+
+function openLogin() {
+  // Si Supabase no está configurado, ir directo a Configuración BD
+  if (!db) {
+    notify('Primero configura la conexión a Supabase');
+    showSection('supabase-setup');
+    return;
+  }
+  const emailEl = document.getElementById('login-email');
+  if (emailEl) emailEl.value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-loading').style.display = 'none';
+  document.getElementById('login-overlay').classList.add('open');
+  setTimeout(() => (emailEl || document.getElementById('login-password')).focus(), 120);
+}
+function closeLogin() { document.getElementById('login-overlay').classList.remove('open'); }
+
+function openModal(id) {
+  if (id === 'modal-researcher-detail') { document.getElementById(id).classList.add('open'); return; }
+  if (!isAdmin) { openLogin(); return; }
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+// ═══════════════════════════════════════════════════════════
 // SUPABASE — CONFIGURACIÓN Y BACKEND
 // Usa la clave pública (anon key) — es seguro exponerla
 // La seguridad real está en las políticas RLS de Supabase
@@ -1692,6 +1772,10 @@ function saveSupabaseConfig() {
   const url = document.getElementById('sb-url-input').value.trim();
   const key = document.getElementById('sb-key-input').value.trim();
   if (!url || !key) { alert('Ingresa la URL y la clave anon'); return; }
+  // Validación básica del formato
+  if (!url.includes('supabase.co')) {
+    if (!confirm('La URL no parece de Supabase (debería contener "supabase.co"). ¿Continuar de todos modos?')) return;
+  }
   localStorage.setItem('sb_url', url);
   localStorage.setItem('sb_key', key);
   SUPABASE_URL = url; SUPABASE_KEY = key;
@@ -1699,11 +1783,25 @@ function saveSupabaseConfig() {
   const res = document.getElementById('sb-test-result');
   res.innerHTML = '<div class="cvu-warn" style="font-size:13px;">🔄 Conectando con Supabase…</div>';
   initSupabase().then(() => {
-    res.innerHTML = db
-      ? '<div class="cvu-ok" style="font-size:13px;">✓ Conectado. Los datos se cargarán en tiempo real. Usa <strong>Ctrl+Shift+A</strong> para iniciar sesión como administrador.</div>'
-      : '<div class="cvu-err" style="font-size:13px;">✕ No se pudo conectar. Verifica la URL y la clave.</div>';
-    if (db) renderDashboard();
+    if (db) {
+      res.innerHTML = '<div class="cvu-ok" style="font-size:13px;">✓ <strong>Conexión exitosa.</strong> Los datos se cargan en tiempo real.<br><br>Ahora inicia sesión como administrador con el correo y contraseña que creaste en Supabase (Authentication → Users).<br><br><button class="btn btn-guinda btn-sm" onclick="openLoginForced()" style="margin-top:4px;">🔑 Iniciar sesión como administrador</button></div>';
+      renderDashboard();
+      renderMetrics();
+    } else {
+      res.innerHTML = '<div class="cvu-err" style="font-size:13px;">✕ No se pudo conectar. Verifica que la URL y la clave anon sean correctas, y que hayas ejecutado el script SQL en Supabase.</div>';
+    }
   });
+}
+
+// Forzar apertura del login (cuando ya hay db configurado)
+function openLoginForced() {
+  const emailEl = document.getElementById('login-email');
+  if (emailEl) emailEl.value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-loading').style.display = 'none';
+  document.getElementById('login-overlay').classList.add('open');
+  setTimeout(() => (emailEl || document.getElementById('login-password')).focus(), 120);
 }
 
 function clearSupabaseConfig() {
@@ -1747,14 +1845,627 @@ function setSyncStatus(state, text) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// RENDERIZADO Y UTILIDADES
+// ═══════════════════════════════════════════════════════════
+function initials(n) {
+  return n.split(' ').filter(w => w.length > 2).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+}
+
+function renderDashboard() {
+  document.getElementById('hs-r').textContent = appData.researchers.length;
+  document.getElementById('hs-p').textContent = appData.projects.length;
+  document.getElementById('hs-pub').textContent = appData.publications.length;
+  document.getElementById('nb-r').textContent = appData.researchers.length;
+  document.getElementById('s-active').textContent = appData.projects.filter(p=>p.status==='Activo').length;
+  const units = new Set(appData.researchers.map(r=>r.unit||r.inst).filter(Boolean));
+  document.getElementById('s-units').textContent = units.size;
+
+  const dp = document.getElementById('dash-projects');
+  dp.innerHTML = appData.projects.length ? appData.projects.slice(0,4).map(p=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+      <div>
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:600;color:var(--guinda);line-height:1.3;margin-bottom:3px;">${p.title.substring(0,65)}${p.title.length>65?'…':''}</div>
+        <div style="font-size:11px;color:var(--text3);">👤 ${p.lead} · ${p.funding}</div>
+      </div>
+      <span class="p-status ${p.status==='Activo'?'s-active':p.status==='En revisión'?'s-review':'s-done'}">${p.status}</span>
+    </div>`).join('') :
+    '<div class="empty-state" style="padding:24px;"><div class="empty-icon">📁</div><div class="empty-desc">Sin proyectos registrados.</div></div>';
+
+  const dr = document.getElementById('dash-researchers');
+  dr.innerHTML = appData.researchers.length ? appData.researchers.slice(0,5).map(r=>`
+    <div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border);">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--guinda);color:var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:800;flex-shrink:0;">${initials(r.name)}</div>
+      <div style="flex:1;">
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:600;">${r.name}</div>
+        <div style="font-size:11px;color:var(--text3);">${r.area} · SNI ${r.sni} · ${r.unit||''}</div>
+      </div>
+      <div style="font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--guinda);">${r.pubs||0}</div>
+    </div>`).join('') :
+    '<div class="empty-state" style="padding:24px;"><div class="empty-icon">👩‍🔬</div><div class="empty-desc">Sin investigadores registrados.</div></div>';
+
+  renderMetrics();
+}
+
+function renderMetrics() {
+  const currentYear = new Date().getFullYear();
+  document.getElementById('metrics-year-badge').textContent = currentYear;
+
+  const arts = appData.publications;
+  const thisYear = arts.filter(p => parseInt(p.year) === currentYear);
+
+  // Conteos por cuartil (este año)
+  const qCount = { Q1:0, Q2:0, Q3:0, Q4:0, NI:0 };
+  thisYear.forEach(p => {
+    const q = (p.quartile||'').toUpperCase();
+    if (qCount[q] !== undefined) qCount[q]++;
+    else qCount.NI++;
+  });
+
+  document.getElementById('m-total').textContent = thisYear.length;
+  document.getElementById('m-q1').textContent = qCount.Q1;
+  document.getElementById('m-q2').textContent = qCount.Q2;
+  document.getElementById('m-q3').textContent = qCount.Q3;
+  document.getElementById('m-q4').textContent = qCount.Q4;
+  document.getElementById('m-ni').textContent  = qCount.NI;
+
+  // ── Gráfica 1: Barras por cuartil ──────────────────────
+  const qb = document.getElementById('quartile-bars');
+  if (!thisYear.length) {
+    qb.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones este año.</div></div>';
+  } else {
+    const total = thisYear.length || 1;
+    const qDefs = [
+      { key:'Q1', label:'Q1', color:'#1E7D35' },
+      { key:'Q2', label:'Q2', color:'#1A5A9A' },
+      { key:'Q3', label:'Q3', color:'#C8960C' },
+      { key:'Q4', label:'Q4', color:'#8B5A2B' },
+      { key:'NI', label:'NI', color:'#AAAAAA'  }
+    ];
+    qb.innerHTML = qDefs.map(q => {
+      const n = qCount[q.key];
+      const pct = Math.round((n/total)*100);
+      return `<div class="quartile-bar-row">
+        <div class="qb-header">
+          <span class="qb-label" style="color:${q.color};">${q.label}</span>
+          <span class="qb-count">${n} art. · ${pct}%</span>
+        </div>
+        <div class="qb-track">
+          <div class="qb-fill" style="width:${pct}%;background:${q.color};"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Gráfica 2: Publicaciones por año (últimos 5) ────────
+  const yearChart = document.getElementById('year-chart-wrap');
+  const years = [];
+  for (let y = currentYear; y >= currentYear-4; y--) years.push(y);
+  years.reverse();
+  const yearCounts = years.map(y => ({
+    y, n: arts.filter(p => parseInt(p.year) === y).length
+  }));
+  const maxN = Math.max(...yearCounts.map(y=>y.n), 1);
+
+  if (!arts.length) {
+    yearChart.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>';
+  } else {
+    yearChart.innerHTML = `
+      <div class="year-chart">
+        ${yearCounts.map(yc => `
+          <div class="year-col">
+            <div class="year-num">${yc.n||''}</div>
+            <div class="year-bar-wrap">
+              <div class="year-bar" style="height:${yc.n?Math.max(8,Math.round((yc.n/maxN)*68)):3}px;opacity:${yc.y===currentYear?'1':'0.6'};background:${yc.y===currentYear?'var(--guinda)':'var(--guinda-mid)'};"></div>
+            </div>
+            <div class="year-lbl">${yc.y}</div>
+          </div>`).join('')}
+      </div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);display:flex;justify-content:space-between;">
+        <span>Total acumulado: <strong style="color:var(--guinda);">${arts.length}</strong></span>
+        <span>Prom/año: <strong style="color:var(--guinda);">${(arts.length/5).toFixed(1)}</strong></span>
+      </div>`;
+  }
+
+  // ── Gráfica 3: Top autores (por aparición en pubs) ─────
+  const topWrap = document.getElementById('top-authors-wrap');
+  if (!arts.length) {
+    topWrap.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>';
+  } else {
+    // Contar por investigador registrado
+    const counts = appData.researchers.map(r => {
+      const lastName = r.name.split(' ').filter(w=>w.length>2)[1] || r.name.split(' ')[0];
+      const n = arts.filter(p => p.authors && p.authors.toLowerCase().includes(lastName.toLowerCase())).length;
+      return { name: r.name, unit: r.unit||r.area||'', n };
+    }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n).slice(0,5);
+
+    if (!counts.length) {
+      topWrap.innerHTML = '<div class="empty-state" style="padding:16px;"><div class="empty-desc">Registra publicaciones con autores de la red.</div></div>';
+    } else {
+      const maxC = counts[0].n;
+      topWrap.innerHTML = counts.map((a,i) => `
+        <div class="top-author">
+          <div class="ta-rank">#${i+1}</div>
+          <div class="ta-info">
+            <div class="ta-name">${a.name.split(' ').slice(0,3).join(' ')}</div>
+            <div class="ta-unit">${a.unit}</div>
+            <div style="height:4px;background:var(--bg2);border-radius:2px;margin-top:4px;overflow:hidden;">
+              <div style="height:100%;width:${Math.round((a.n/maxC)*100)}%;background:var(--guinda);border-radius:2px;"></div>
+            </div>
+          </div>
+          <div class="ta-count">${a.n}</div>
+        </div>`).join('');
+    }
+  }
+}
+
+function renderResearchers(filtered = appData.researchers) {
+  const grid = document.getElementById('researcher-grid');
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">🔍</div><div class="empty-title">Sin resultados</div><div class="empty-desc">No se encontraron investigadores con ese criterio.</div></div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(r => `
+    <div class="rc" onclick="showResearcherDetail(${r.id})">
+      <div class="rc-header">
+        <div class="rc-monogram">${initials(r.name)}</div>
+        <div>
+          <div class="rc-name">${r.name}</div>
+          <div class="rc-dept">${r.dept || r.area}</div>
+          ${r.unit ? `<span class="rc-unit">${r.unit}</span>` : ''}
+        </div>
+      </div>
+      <div class="rc-body">
+        <span class="rc-area">${r.area}</span>
+        ${r.bio ? `<p class="rc-bio">${r.bio.substring(0,100)}…</p>` : ''}
+        <div class="rc-tags">${(r.lines||[]).slice(0,3).map(l=>`<span class="rc-tag">${l}</span>`).join('')}</div>
+        <div class="rc-meta">
+          <span>📄 ${r.pubs||0} pubs</span>
+          <span>🎓 SNI ${r.sni}</span>
+          ${r.unit?`<span>🏛️ ${r.unit}</span>`:''}
+        </div>
+        <div class="rc-links">
+          ${r.orcid?`<a class="pl-link" href="https://orcid.org/${r.orcid}" target="_blank" onclick="event.stopPropagation()">ORCID</a>`:''}
+          <a class="pl-link" href="https://scholar.google.com/scholar?q=${encodeURIComponent(r.name)}" target="_blank" onclick="event.stopPropagation()">Scholar</a>
+          ${r.email?`<a class="pl-link" href="mailto:${r.email}" onclick="event.stopPropagation()">Email</a>`:''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function filterResearchers(q) {
+  renderResearchers(appData.researchers.filter(r =>
+    r.name.toLowerCase().includes(q.toLowerCase()) ||
+    (r.area||'').toLowerCase().includes(q.toLowerCase()) ||
+    (r.unit||'').toLowerCase().includes(q.toLowerCase()) ||
+    (r.lines||[]).join(' ').toLowerCase().includes(q.toLowerCase())
+  ));
+}
+
+function filterByArea(area, btn) {
+  document.querySelectorAll('.fc').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  renderResearchers(area==='all' ? appData.researchers : appData.researchers.filter(r=>r.area===area));
+}
+
+function showResearcherDetail(id) {
+  const r = appData.researchers.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('detail-name').textContent = r.name;
+  document.getElementById('detail-dept').textContent = (r.dept||r.area) + (r.unit?' · '+r.unit:'') + (r.inst?' · '+r.inst:'');
+
+  document.getElementById('detail-info-content').innerHTML = `
+    <div class="info-row"><span class="ir-label">Institución</span><span class="ir-value">${r.inst||'—'}</span></div>
+    <div class="info-row"><span class="ir-label">Unidad académica</span><span class="ir-value">${r.unit||'—'}</span></div>
+    <div class="info-row"><span class="ir-label">Área de conocimiento</span><span class="ir-value">${r.areaCompleta||r.area||'—'}</span></div>
+    <div class="info-row"><span class="ir-label">Nivel SNI</span><span class="ir-value">${r.sni||'—'}</span></div>
+    <div class="info-row"><span class="ir-label">CVU Rizoma</span><span class="ir-value">${r.cvu?`<a href="https://rizoma.conacyt.mx/" target="_blank" style="color:var(--guinda);">#${r.cvu} ↗</a>`:'No registrado'}</span></div>
+    <div class="info-row"><span class="ir-label">Email institucional</span><span class="ir-value">${r.email?`<a href="mailto:${r.email}" style="color:var(--guinda);">${r.email}</a>`:'—'}</span></div>
+    <div style="margin-top:16px;">
+      <div style="font-family:var(--font-head);font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Líneas de investigación</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">${(r.lines||[]).map(l=>`<span class="rc-tag">${l}</span>`).join('')||'—'}</div>
+    </div>
+    ${r.bio?`<div style="margin-top:16px;"><div style="font-family:var(--font-head);font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Semblanza</div><p style="font-size:13px;color:var(--text2);line-height:1.7;">${r.bio}</p></div>`:''}
+  `;
+
+  const pc = document.getElementById('detail-pubs-content');
+  if (r.orcid) {
+    pc.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text3);">🔄 Cargando publicaciones desde ORCID…</div>';
+    fetchORCIDWorks(r.orcid).then(works => {
+      pc.innerHTML = works.length ? works.map(w=>`
+        <div style="padding:11px 0;border-bottom:1px solid var(--border);">
+          <div style="font-family:var(--font-head);font-size:13.5px;font-weight:600;color:var(--guinda);margin-bottom:3px;line-height:1.4;">${w.title}</div>
+          <div style="font-size:11.5px;color:var(--text3);">${w.journal||''} ${w.year?'· '+w.year:''}</div>
+          ${w.doi?`<a href="https://doi.org/${w.doi}" target="_blank" class="pl-link" style="display:inline-flex;margin-top:7px;font-size:10px;">DOI ↗</a>`:''}
+        </div>`).join('') :
+        '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-desc">Sin publicaciones públicas en ORCID o el perfil es privado.</div></div>';
+    }).catch(() => { pc.innerHTML = '<div class="empty-state"><div class="empty-desc">No se pudo conectar con ORCID. Verifica tu conexión a internet.</div></div>'; });
+  } else {
+    pc.innerHTML = '<div class="empty-state"><div class="empty-icon">🟢</div><div class="empty-title">ORCID no registrado</div><div class="empty-desc">Las publicaciones se mostrarán automáticamente una vez vinculado el ORCID.</div></div>';
+  }
+
+  document.getElementById('detail-platforms-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+      ${r.orcid
+        ? `<a href="https://orcid.org/${r.orcid}" target="_blank" style="display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-lg);text-decoration:none;color:var(--text);transition:border 0.15s;" onmouseover="this.style.borderColor='var(--guinda)'" onmouseout="this.style.borderColor='var(--border)'">
+            <div style="width:42px;height:42px;border-radius:6px;background:#A6CE39;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-weight:800;font-size:12px;color:#fff;flex-shrink:0;">ID</div>
+            <div><div style="font-family:var(--font-head);font-size:13.5px;font-weight:700;color:var(--guinda);">ORCID</div><div style="font-size:12px;color:var(--text3);">orcid.org/${r.orcid}</div></div>
+            <span style="margin-left:auto;color:var(--guinda);">↗</span>
+          </a>`
+        : `<div style="padding:14px;border:1px dashed var(--border);border-radius:var(--radius-lg);font-size:13px;color:var(--text3);">ORCID no registrado — carga el CVU de Rizoma para vincularlo.</div>`
+      }
+      <a href="https://scholar.google.com/scholar?q=${encodeURIComponent(r.name)}" target="_blank" style="display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-lg);text-decoration:none;color:var(--text);transition:border 0.15s;" onmouseover="this.style.borderColor='var(--guinda)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="width:42px;height:42px;border-radius:6px;background:#4285F4;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🎓</div>
+        <div><div style="font-family:var(--font-head);font-size:13.5px;font-weight:700;color:var(--guinda);">Google Scholar</div><div style="font-size:12px;color:var(--text3);">Artículos, citas e índice h</div></div>
+        <span style="margin-left:auto;color:var(--guinda);">↗</span>
+      </a>
+      ${r.email ? `<a href="mailto:${r.email}" style="display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-lg);text-decoration:none;color:var(--text);transition:border 0.15s;" onmouseover="this.style.borderColor='var(--guinda)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="width:42px;height:42px;border-radius:6px;background:var(--guinda);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">✉️</div>
+        <div><div style="font-family:var(--font-head);font-size:13.5px;font-weight:700;color:var(--guinda);">Correo institucional</div><div style="font-size:12px;color:var(--text3);">${r.email}</div></div>
+        <span style="margin-left:auto;color:var(--guinda);">↗</span>
+      </a>` : ''}
+      ${isAdmin ? `<button onclick="closeModal('modal-researcher-detail');showSection('cvu');" style="display:flex;align-items:center;gap:14px;padding:13px 14px;border:1.5px dashed var(--guinda);border-radius:var(--radius-lg);background:var(--guinda-soft);width:100%;cursor:pointer;font-family:var(--font-body);font-size:13px;color:var(--guinda);">📋 Actualizar perfil cargando CVU de Rizoma →</button>` : ''}
+    </div>
+  `;
+  openModal('modal-researcher-detail');
+}
+
+async function fetchORCIDWorks(orcid) {
+  const res = await fetch(`https://pub.orcid.org/v3.0/${orcid}/works`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error('ORCID error');
+  const data = await res.json();
+  return (data.group||[]).slice(0,30).map(g => {
+    const ws = g['work-summary']?.[0]; if (!ws) return null;
+    const doi = (ws['external-ids']?.['external-id']||[]).find(x=>x['external-id-type']==='doi')?.['external-id-value']||'';
+    return { title: ws.title?.title?.value||'Sin título', year: ws['publication-date']?.year?.value||'', journal: ws['journal-title']?.value||'', doi, url: doi?'https://doi.org/'+doi:(ws.url?.value||'') };
+  }).filter(Boolean);
+}
+
+function renderProjects(filtered = appData.projects) {
+  const list = document.getElementById('project-list');
+  if (!filtered.length) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div><div class="empty-title">Sin proyectos registrados</div><div class="empty-desc">Agrega los proyectos vigentes de la red.</div></div>'; return; }
+  list.innerHTML = filtered.map(p => `
+    <div class="project-item">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px;">
+        <div class="project-title">${p.title}</div>
+        <span class="p-status ${p.status==='Activo'?'s-active':p.status==='En revisión'?'s-review':'s-done'}">${p.status}</span>
+      </div>
+      <p class="project-desc">${p.desc}</p>
+      <div class="project-meta">
+        <span>👤 ${p.lead}</span>
+        <span>💰 ${p.funding}</span>
+        <span>📅 ${p.start||'—'} → ${p.end||'—'}</span>
+      </div>
+      ${p.collabs&&p.collabs.length?`<div class="project-collabs">${(Array.isArray(p.collabs)?p.collabs:p.collabs.split(',')).map(c=>`<span class="p-chip">👩‍🔬 ${c.trim()}</span>`).join('')}</div>`:''}
+    </div>`).join('');
+}
+
+function filterProjects(s,btn) { document.querySelectorAll('.fc').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderProjects(s==='all'?appData.projects:appData.projects.filter(p=>p.status===s)); }
+
+function renderPublications(filtered = appData.publications) {
+  const list = document.getElementById('pub-list');
+  if (!filtered.length) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-title">Sin publicaciones registradas</div><div class="empty-desc">Las publicaciones se cargan desde ORCID al agregar investigadores.</div></div>'; return; }
+  list.innerHTML = filtered.map(p=>`
+    <div class="pub-item">
+      <span class="pub-year">${p.year}</span>
+      <div style="flex:1;">
+        <div class="pub-title">${p.title}</div>
+        <div class="pub-authors">${p.authors}</div>
+        <div class="pub-journal">${p.journal}${p.if?' · IF: '+p.if:''}</div>
+        <div class="pub-actions">
+          ${p.quartile?`<span class="q-pill ${p.quartile}">${p.quartile}</span>`:''}
+          ${p.doi?`<a href="https://doi.org/${p.doi}" target="_blank" class="pl-link" style="font-size:10.5px;">DOI ↗</a>`:''}
+          ${p.url?`<a href="${p.url}" target="_blank" class="pl-link" style="font-size:10.5px;">Ver ↗</a>`:''}
+          <span class="rc-tag" style="font-size:10.5px;">${p.type}</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function filterPublications(q) { renderPublications(appData.publications.filter(p=>p.title.toLowerCase().includes(q.toLowerCase())||p.authors.toLowerCase().includes(q.toLowerCase()))); }
+
+function filterPubType(t,btn) { document.querySelectorAll('.fc').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderPublications(t==='all'?appData.publications:appData.publications.filter(p=>p.type===t)); }
+
+function renderNetwork() {
+  const canvas = document.getElementById('netCanvas'), container = document.getElementById('network-container');
+  canvas.width = container.offsetWidth; canvas.height = container.offsetHeight;
+  const ctx = canvas.getContext('2d'), W=canvas.width, H=canvas.height;
+  ctx.fillStyle = '#F7F7F7'; ctx.fillRect(0,0,W,H);
+  if (!appData.researchers.length) {
+    ctx.fillStyle = '#888'; ctx.font = '14px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('Agrega investigadores para ver el mapa de red', W/2, H/2);
+    return;
+  }
+  const cx=W/2, cy=H/2, N=Math.min(appData.researchers.length,10), R=Math.min(W,H)*0.3;
+  const areaC = {'Salud Pública':'#6A1537','Clínica':'#1E7D35','Básica':'#C8960C','Epidemiología':'#5A3080','Nutrición':'#1A5A7A','Conducta':'#7A3A1A'};
+  const nodes = appData.researchers.slice(0,N).map((r,i) => {
+    const a = (2*Math.PI*i/N)-Math.PI/2;
+    return { name:r.name.split(' ').slice(0,2).join(' '), x:cx+R*Math.cos(a), y:cy+R*Math.sin(a), color:areaC[r.area]||'#6A1537', r:22 };
+  });
+  nodes.push({ name:'Red\nSalud\nIPN', x:cx, y:cy, color:'#4E0E28', r:34, center:true });
+  const edges = []; for(let i=0;i<N;i++) edges.push({a:i,b:N,w:2});
+  [[0,1],[1,2],[2,3],[0,3],[1,4]].forEach(([a,b])=>{ if(a<N&&b<N) edges.push({a,b,w:1}); });
+  // Grid
+  ctx.strokeStyle = 'rgba(106,21,55,0.05)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  edges.forEach(e => {
+    const na=nodes[e.a],nb=nodes[e.b];
+    ctx.beginPath();ctx.moveTo(na.x,na.y);ctx.lineTo(nb.x,nb.y);
+    ctx.strokeStyle=e.w>1?'rgba(106,21,55,0.2)':'rgba(106,21,55,0.1)';
+    ctx.lineWidth=e.w>1?2:1; ctx.stroke();
+  });
+  nodes.forEach(n => {
+    ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    ctx.fillStyle=n.color; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.fillStyle='#fff';
+    ctx.font = `bold ${n.center?10:9}px Montserrat,Arial,sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    n.name.split('\n').forEach((l,i,arr) => ctx.fillText(l,n.x,n.y+(i-(arr.length-1)/2)*12));
+  });
+}
+
+function renderCollaborations() {
+  const svg = document.getElementById('world-map');
+  if (!appData.collaborations.national.length && !appData.collaborations.international.length) {
+    svg.innerHTML = `<rect width="900" height="450" fill="#F7F7F7"/><text x="450" y="225" text-anchor="middle" font-size="14" fill="#888" font-family="Arial">Sin colaboraciones registradas aún</text>`;
+    return;
+  }
+  const points = [
+    {x:175,y:220,type:'main',label:'Sede IPN',r:13},
+    ...appData.collaborations.national.slice(0,5).map((c,i)=>({x:165+i*10,y:225+i*8,type:'nat',label:c.inst.substring(0,16),r:7})),
+    ...appData.collaborations.international.slice(0,6).map((c,i)=>({x:300+i*80,y:180+i*30,type:'intl',label:c.inst.substring(0,12),r:7}))
+  ];
+  const col={main:'#6A1537',nat:'#1E7D35',intl:'#C8960C'};
+  svg.innerHTML=`<rect width="900" height="450" fill="#F3EDE3"/>
+    ${Array.from({length:23},(_,i)=>`<line x1="${i*40}" y1="0" x2="${i*40}" y2="450" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
+    ${Array.from({length:12},(_,i)=>`<line x1="0" y1="${i*40}" x2="900" y2="${i*40}" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
+    <ellipse cx="450" cy="225" rx="400" ry="180" fill="rgba(106,21,55,0.04)" stroke="rgba(106,21,55,0.08)" stroke-width="1"/>
+    ${points.slice(1).map(p=>`<line x1="175" y1="220" x2="${p.x}" y2="${p.y}" stroke="${col[p.type]}" stroke-width="1.2" stroke-dasharray="${p.type==='intl'?'5,3':'none'}" opacity="0.45"/>`).join('')}
+    ${points.map(p=>`<g><circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="${col[p.type]}" opacity="0.85" stroke="white" stroke-width="1.5"/>${p.r>8?`<text x="${p.x}" y="${p.y+p.r+12}" text-anchor="middle" font-size="9" fill="${col[p.type]}" font-family="Montserrat,Arial">${p.label}</text>`:''}</g>`).join('')}
+    <text x="14" y="438" font-size="9" fill="rgba(106,21,55,0.35)" font-family="Montserrat,Arial" letter-spacing="1">RED DE SALUD IPN · REI06-RSAL · COLABORACIONES</text>`;
+
+  document.getElementById('national-collabs').innerHTML = appData.collaborations.national.length
+    ? appData.collaborations.national.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.city||'México'} · ${c.projects||0} proyectos</span></div>`).join('')
+    : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones nacionales registradas.</div></div>';
+  document.getElementById('international-collabs').innerHTML = appData.collaborations.international.length
+    ? appData.collaborations.international.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.country||'—'} · ${c.projects||0} proyectos</span></div>`).join('')
+    : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones internacionales registradas.</div></div>';
+}
+
+function renderAdmin() {
+  if (!isAdmin) { showSection('dashboard'); return; }
+  document.getElementById('admin-r-body').innerHTML = appData.researchers.length
+    ? appData.researchers.map(r=>`<tr><td>${r.name}</td><td>${r.area}</td><td>${r.unit||'—'}</td><td>${r.cvu||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteResearcher(${r.id})">Eliminar</button></td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--text3);font-style:italic;padding:20px;">Sin registros</td></tr>';
+  document.getElementById('admin-p-body').innerHTML = appData.projects.length
+    ? appData.projects.map(p=>`<tr><td style="font-size:12px;">${p.title.substring(0,50)}…</td><td><span class="p-status ${p.status==='Activo'?'s-active':p.status==='En revisión'?'s-review':'s-done'}">${p.status}</span></td><td><button class="btn btn-danger btn-sm" onclick="deleteProject(${p.id})">Eliminar</button></td></tr>`).join('')
+    : '<tr><td colspan="3" style="text-align:center;color:var(--text3);font-style:italic;padding:20px;">Sin registros</td></tr>';
+}
+
+function exportJSON(){const b=new Blob([JSON.stringify(appData,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='redsalud_ipn_rei06.json';a.click();notify('✓ JSON exportado');}
+
+function exportCSV(){const rows=[['ID','Nombre','Unidad','Institución','Área','SNI','ORCID','Email','CVU']];appData.researchers.forEach(r=>rows.push([r.id,r.name,r.unit||'',r.inst||'',r.area,r.sni,r.orcid||'',r.email||'',r.cvu||'']));const b=new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='investigadores_rei06rsal.csv';a.click();notify('✓ CSV exportado');}
+
+function exportCSVProjects(){const rows=[['ID','Título','Estado','Financiamiento','Inicio','Fin','Responsable']];appData.projects.forEach(p=>rows.push([p.id,'"'+p.title+'"',p.status,p.funding,p.start,p.end,p.lead]));const b=new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='proyectos_rei06rsal.csv';a.click();notify('✓ CSV proyectos exportado');}
+
+function notify(msg){const n=document.getElementById('notification');document.getElementById('notification-text').textContent=msg;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),3200);}
+
+function loadPdfLib(cb){if(_pdfLibReady){cb();return;}if(_pdfLibLoading){setTimeout(()=>loadPdfLib(cb),300);return;}_pdfLibLoading=true;const s=document.createElement('script');s.type='text/javascript';s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';s.onload=()=>{try{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';_pdfLibReady=true;cb();}catch(e){_pdfLibLoading=false;cb(e);}};s.onerror=()=>{_pdfLibLoading=false;cb(new Error('Error cargando pdf.js'));};document.head.appendChild(s);}
+
+async function extractTextFromPDF(buf){const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;let items=[];for(let p=1;p<=pdf.numPages;p++){const pg=await pdf.getPage(p);const tc=await pg.getTextContent();tc.items.forEach(it=>{if(it.str&&it.str.trim())items.push(it.str.trim());});items.push('|||PAGE|||');}return items;}
+
+function parseCVURizoma(items){
+  const text=items.join(' ');const find=(rx,g=1)=>{const m=text.match(rx);return m?m[g].trim():'';};
+  let nombre='';const idxCVU=items.findIndex(s=>/NO\.?CVU/i.test(s));
+  if(idxCVU>0){const cands=items.slice(Math.max(0,idxCVU-8),idxCVU).filter(s=>/^[A-ZÁÉÍÓÚÑÜ\s]+$/.test(s)&&s.length>2);nombre=cands.join(' ').replace(/\s+/g,' ').trim().replace(/PERFIL|RIZOMA|CIENCIA|TECNOLOG[IÍ]A|SECRETAR[IÍ]A|CVU/gi,'').trim();}
+  if(!nombre){const m=text.match(/([A-ZÁÉÍÓÚÑÜ]{2,}\s+[A-ZÁÉÍÓÚÑÜ]{2,}(?:\s+[A-ZÁÉÍÓÚÑÜ]{2,}){0,4})\s+NO\.?CVU/i);if(m)nombre=m[1].trim();}
+  const cvu=find(/NO\.?CVU[:\s#]*(\d{4,10})/i)||find(/CVU[:\s#]*(\d{4,10})/i);
+  const orcid=find(/(\d{4}-\d{4}-\d{4}-\d{3}[\dX])/i)||find(/ORC\s*ID[:\s]*([\d\-X]{16,20})/i);
+  const email=find(/([a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  const sniMap={'1':'Nivel I','2':'Nivel II','3':'Nivel III','CANDIDATO':'Candidato','EMÉRITO':'Emérito','EMERITO':'Emérito'};
+  let sni='No aplica';const idxSNI=items.findIndex(s=>/^SNI$/i.test(s));
+  if(idxSNI>=0){const v=(items[idxSNI+1]||'').trim().toUpperCase();sni=sniMap[v]||'Nivel '+v||'No aplica';}else{const m=text.match(/LOGROS[\s\S]{0,30}SNI\s*(\d+|CANDIDATO|EM[EÉ]RITO)/i);if(m)sni=sniMap[m[1].toUpperCase()]||'Nivel '+m[1];}
+  // Institución
+  let inst='';const idxEmp=items.findIndex(s=>/EMPLEO ACTUAL/i.test(s));
+  if(idxEmp>=0){const ch=items.slice(idxEmp+1,idxEmp+8).join(' ');const m=ch.match(/(INSTITUTO[\w\s]+NACIONAL|UNAM|CINVESTAV|IMSS|[\w\s]+POLITEC[\w\s]+)/i);if(m)inst=m[1].trim();}
+  if(!inst&&/INSTITUTO POLITECNICO NACIONAL/i.test(text))inst='Instituto Politécnico Nacional';
+  // Unidad académica IPN
+  const unitMatch=text.match(/(?:ENCB|ESM|ENMH|CBG|CEPROBI|CIIDIR|CICATA|CICIMAR|CICS|CIECAS|CIIEMAD|CITEDI|ENCB|ESEO|UPIBI|UPIITA|UPIIZ|ESCOM|CINVESTAV)/i);
+  const unit = unitMatch ? unitMatch[0].toUpperCase() : '';
+  // Área/disciplina
+  let area='',disc='',subdisc='';
+  const iA=items.findIndex(s=>/^ÁREA[:\s]*$/i.test(s)||/^AREA[:\s]*$/i.test(s));if(iA>=0)area=(items[iA+1]||'').replace(/^[:]\s*/,'').trim();
+  const iD=items.findIndex(s=>/^DISCIPLINA[:\s]*$/i.test(s));if(iD>=0)disc=(items[iD+1]||'').replace(/^[:]\s*/,'').trim();
+  const iS=items.findIndex(s=>/SUB\s*DISCIPLINA/i.test(s));if(iS>=0)subdisc=(items[iS+1]||'').replace(/^[:]\s*/,'').trim();
+  if(!disc)disc=find(/DISCIPLINA[:\s]+([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ\s]{3,40})(?=\s+SUB|\s+ÁREA|\s+CAMPO)/i);
+  // Bio
+  let bio='';const iP=items.findIndex(s=>/^PERFIL$/i.test(s)),iI=items.findIndex(s=>/INFORMACI[OÓ]N GENERAL/i.test(s));
+  if(iP>=0&&iI>iP)bio=items.slice(iP+1,iI).join(' ').replace(/\s+/g,' ').trim();
+  if(!bio)bio=text.split(/\n{2,}/).sort((a,b)=>b.length-a.length)[0]?.substring(0,800)||'';
+  bio=bio.substring(0,700);
+  // Artículos
+  const dois=[...text.matchAll(/DOI[:\s]+(10\.\d{4,}\/[\w\.\-\/]+)/gi)];
+  const anos=[...text.matchAll(/A[ÑN]O[:\s]+(\d{4})/gi)];
+  const articulos=[];
+  dois.forEach((dm,i)=>{
+    const doi=dm[1].trim(),pos=dm.index;let year=2020;
+    for(let j=anos.length-1;j>=0;j--){if(anos[j].index<pos){year=parseInt(anos[j][1]);break;}}
+    const zone=text.substring(Math.max(0,pos-400),pos);
+    const tm=zone.match(/([A-ZÁÉÍÓÚÑÜ\(\)][A-ZÁÉÍÓÚÑÜA-Za-z\s\-\(\):,\.\'\/]{25,220})(?=\s+(?:JOURNAL|REVISTA|MOLECULES|HELIYON|INORGANICS|NUTRIENTS|SCIENCE|MEDICINE|PHARMACOL|NEUROBIOL|CLINICAL|FOOD|MODELL|BIOORGANIC|EUROPEAN|INTERNATIONAL|INFORMATICS|AÑO))/i);
+    const title=tm?tm[1].replace(/\s+/g,' ').trim():`Publicación ${i+1}`;
+    const rm=zone.match(/(JOURNAL[\w\s]+|MOLECULES|HELIYON|INORGANICS|NUTRIENTS|[\w\s]+SCIENCE|[\w\s]+MEDICINE|[\w\s]+PHARMACOL[\w\s]*|NEUROBIOLOGY|INFORMATICS[\w\s]+|BIOORGANIC[\w\s]+|EUROPEAN[\w\s]+)/i);
+    const am=text.substring(pos,pos+300).match(/AUTOR\(ES\)[:\s]+([^\n]{10,200})/i);
+    const authors=am?am[1].replace(/\s+/g,' ').trim().substring(0,120):nombre;
+    const tc2=text.substring(Math.max(0,pos-600),pos);
+    const type=/CAP[IÍ]TULO/i.test(tc2)?'Capítulo':/DIFUSI[OÓ]N/i.test(tc2)?'Difusión':'Artículo';
+    if(title&&!articulos.find(a=>a.doi===doi))articulos.push({id:100+i,title,type,year,authors,journal:rm?rm[1].trim():'',doi,if:'',url:'https://doi.org/'+doi});
+  });
+  const areaMap=[[/farmacol|molecul|biol|bioqu|gen[oó]m|qu[ií]m|fisiolog/i,'Básica'],[/epidem/i,'Epidemiología'],[/salud p[uú]bl|comunit/i,'Salud Pública'],[/cl[ií]nic|medicina/i,'Clínica'],[/nutrici/i,'Nutrición'],[/conduct|psic/i,'Conducta']];
+  let areaSelect='Básica';for(const[rx,v]of areaMap){if(rx.test(disc||area)){areaSelect=v;break;}}
+  const areaCompleta=[area,disc,subdisc].filter(Boolean).join(' › ');
+  const lines=[disc,subdisc].filter(Boolean).map(s=>s.charAt(0).toUpperCase()+s.slice(1).toLowerCase()).filter(Boolean).slice(0,4);
+  return{nombre,cvu,orcid,email,sni,inst,unit,area:areaSelect,areaCompleta,disciplina:disc,subdisciplina:subdisc,bio,lines:[...new Set(lines)],articulos};
+}
+
+function handleCVUFile(input){
+  const file=Array.isArray(input)?input[0]:(input.files&&input.files[0]);if(!file)return;
+  document.getElementById('cvu-file-display').innerHTML=`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text2);">📄 ${file.name} · ${(file.size/1024).toFixed(1)} KB</div>`;
+  document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-warn" style="font-size:13px;">🔄 Cargando lector de PDF…</div>`;
+  loadPdfLib(err=>{
+    if(err){document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-err" style="font-size:13px;">✕ No se pudo cargar el lector. Verifica tu conexión a internet.</div>`;return;}
+    const reader=new FileReader();
+    reader.onload=async e=>{
+      try{
+        document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-warn" style="font-size:13px;">🔄 Extrayendo datos del Perfil Único Rizoma…</div>`;
+        const items=await extractTextFromPDF(e.target.result);const d=parseCVURizoma(items);
+        if(d.nombre)document.getElementById('cvu-name').value=d.nombre;
+        if(d.cvu)document.getElementById('cvu-number').value=d.cvu;
+        if(d.inst)document.getElementById('cvu-institution').value=d.inst;
+        if(d.unit)document.getElementById('cvu-unit').value=d.unit;
+        if(d.orcid)document.getElementById('cvu-orcid').value=d.orcid;
+        if(d.email)document.getElementById('cvu-email').value=d.email;
+        if(d.bio)document.getElementById('cvu-bio').value=d.bio;
+        if(d.lines.length)document.getElementById('cvu-lines').value=d.lines.join(', ');
+        const sniSel=document.getElementById('cvu-sni');for(const o of sniSel.options){if(o.value===d.sni){sniSel.value=d.sni;break;}}
+        document.getElementById('cvu-area').value=d.area||'Básica';
+        window._cvuArticulos=d.articulos;window._cvuAreaCompleta=d.areaCompleta;window._cvuDisciplina=d.disciplina;window._cvuSubdisciplina=d.subdisciplina;
+        const campos=[d.nombre&&'Nombre',d.cvu&&'CVU',d.orcid&&'ORCID',d.email&&'Email',d.unit&&'Unidad',d.sni!=='No aplica'&&'SNI',d.inst&&'Institución',d.bio&&'Semblanza',d.lines.length&&'Líneas',d.articulos.length&&`${d.articulos.length} artículos`].filter(Boolean);
+        document.getElementById('cvu-result-area').innerHTML=campos.length>=3
+          ?`<div class="cvu-ok"><div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#1E7D35;margin-bottom:6px;">✓ Extracción exitosa</div><div style="font-size:12px;color:var(--text2);">${campos.join(' · ')}</div><div style="font-size:11.5px;color:var(--text3);margin-top:6px;">Revisa y corrige los datos antes de guardar.</div></div>`
+          :`<div class="cvu-warn"><div style="font-size:12.5px;color:#8B6914;">Extracción parcial — completa el formulario manualmente con los datos del PDF.</div></div>`;
+        notify(`✓ ${campos.length} campos extraídos del CVU Rizoma`);
+      }catch(ex){console.error(ex);document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-err" style="font-size:13px;">✕ Error al procesar el PDF. Captura los datos manualmente.</div>`;}
+    };reader.readAsArrayBuffer(file);
+  });
+}
+
+function handleCVUDrop(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf')handleCVUFile([f]);}
+
+function processCVUURL(){const u=document.getElementById('cvu-url').value;if(!u)return;notify('Procesando URL de Rizoma…');}
+
+// ═══════════════════════════════════════════════════════════
+// CONEXIÓN UI → SUPABASE (formularios y botones)
+// ═══════════════════════════════════════════════════════════
+async function addResearcher(){
+  const name=document.getElementById('r-name').value.trim();
+  if(!name){alert('El nombre es obligatorio');return;}
+  const ok = await saveResearcher({
+    name, dept:document.getElementById('r-area').value,
+    unit:document.getElementById('r-unit').value, inst:document.getElementById('r-inst').value,
+    area:document.getElementById('r-area').value, sni:document.getElementById('r-sni').value,
+    orcid:document.getElementById('r-orcid').value, cvu:document.getElementById('r-cvu').value,
+    email:document.getElementById('r-email').value, bio:document.getElementById('r-bio').value,
+    lines:document.getElementById('r-lines').value.split(',').map(s=>s.trim()).filter(Boolean),
+    pubs:0, rizoma:'https://rizoma.conacyt.mx/'
+  });
+  if(ok){
+    closeModal('modal-researcher');
+    ['r-name','r-dept','r-unit','r-inst','r-orcid','r-cvu','r-email','r-lines','r-bio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }
+}
+
+async function addProject(){
+  const title=document.getElementById('p-title').value.trim();
+  if(!title){alert('El título es obligatorio');return;}
+  const ok = await saveProject({
+    title, status:document.getElementById('p-status').value,
+    funding:document.getElementById('p-funding').value,
+    start:document.getElementById('p-start').value, end:document.getElementById('p-end').value,
+    lead:document.getElementById('p-lead').value,
+    collabs:document.getElementById('p-collabs').value.split(',').map(s=>s.trim()).filter(Boolean),
+    desc:document.getElementById('p-desc').value, type:'Investigación'
+  });
+  if(ok){
+    closeModal('modal-project');
+    ['p-title','p-start','p-end','p-lead','p-collabs','p-desc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }
+}
+
+async function addPublication(){
+  const title=document.getElementById('pub-title').value.trim();
+  if(!title){alert('El título es obligatorio');return;}
+  const ok = await savePublication({
+    title, type:document.getElementById('pub-type').value,
+    year:document.getElementById('pub-year').value,
+    authors:document.getElementById('pub-authors').value,
+    journal:document.getElementById('pub-journal').value,
+    doi:document.getElementById('pub-doi').value,
+    if:document.getElementById('pub-if').value,
+    quartile:document.getElementById('pub-quartile').value,
+    issn:document.getElementById('pub-issn').value,
+    url:document.getElementById('pub-url').value
+  });
+  if(ok){
+    closeModal('modal-publication');
+    ['pub-title','pub-year','pub-authors','pub-journal','pub-doi','pub-if','pub-issn','pub-url'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }
+}
+
+function deleteResearcher(id){ deleteResearcherDB(id); }
+function deleteProject(id){ deleteProjectDB(id); }
+
+async function saveCVUResearcher(){
+  const name=document.getElementById('cvu-name').value.trim();
+  if(!name){alert('El nombre es obligatorio');return;}
+  const data = {
+    name,
+    cvu:document.getElementById('cvu-number').value,
+    unit:document.getElementById('cvu-unit').value,
+    inst:document.getElementById('cvu-institution').value,
+    area:document.getElementById('cvu-area').value,
+    areaCompleta:window._cvuAreaCompleta||'',
+    disciplina:window._cvuDisciplina||'',
+    subdisciplina:window._cvuSubdisciplina||'',
+    sni:document.getElementById('cvu-sni').value,
+    orcid:document.getElementById('cvu-orcid').value,
+    email:document.getElementById('cvu-email').value,
+    lines:document.getElementById('cvu-lines').value.split(',').map(s=>s.trim()).filter(Boolean),
+    bio:document.getElementById('cvu-bio').value,
+    pubs:0, rizoma:'https://rizoma.conacyt.mx/'
+  };
+  const ok = await saveResearcher(data);
+  if(!ok) return;
+  // Guardar artículos extraídos del CVU en la BD
+  if(window._cvuArticulos && window._cvuArticulos.length){
+    let saved=0;
+    for(const a of window._cvuArticulos){
+      if(a.title && !appData.publications.find(p=>p.doi===a.doi)){
+        const r = await savePublication({...a, if:a.if||''});
+        if(r) saved++;
+      }
+    }
+    if(saved>0) notify('✓ +'+saved+' publicaciones guardadas en la BD');
+    window._cvuArticulos=null;
+  }
+  window._cvuAreaCompleta=null;window._cvuDisciplina=null;window._cvuSubdisciplina=null;
+  ['cvu-name','cvu-number','cvu-institution','cvu-unit','cvu-orcid','cvu-email','cvu-lines','cvu-bio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+// ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
 (async function init(){
   renderDashboard();
-  // Polling automático cada 60 segundos
-  // Supabase Realtime activo — no necesita polling
-  // Acceso admin por URL
-  if(window.location.search.includes('admin')) setTimeout(openLogin, 500);
+  renderMetrics();
+  updateCurrentUrl();
+
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    // Ya hay credenciales guardadas → conectar
+    await initSupabase();
+    renderDashboard();
+    renderMetrics();
+    // Si entró con ?admin y ya hay conexión, abrir login
+    if (window.location.search.includes('admin')) setTimeout(openLogin, 600);
+  } else {
+    // Primera vez sin configurar → guiar a Configuración BD
+    setSyncStatus('warning', 'Configura Supabase para empezar');
+    // Mostrar la pantalla de configuración automáticamente
+    setTimeout(() => {
+      showSection('supabase-setup');
+      notify('👋 Bienvenido. Configura la conexión a Supabase para comenzar.');
+    }, 400);
+  }
 })();
 </script>
 </body>
