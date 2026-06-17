@@ -1429,6 +1429,17 @@ body {
 
 <script>
 // ═══════════════════════════════════════════════════════════
+// ESTADO GLOBAL — datos de la plataforma (vacío al inicio)
+// Se llena desde Supabase en tiempo real
+// ═══════════════════════════════════════════════════════════
+let appData = {
+  researchers: [],
+  projects: [],
+  publications: [],
+  collaborations: { national: [], international: [] }
+};
+
+// ═══════════════════════════════════════════════════════════
 // NAVEGACIÓN Y CONTROL DE ACCESO
 // ═══════════════════════════════════════════════════════════
 const sectionTitles = {
