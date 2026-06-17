@@ -1283,41 +1283,51 @@ body {
   </section>
 
   <!-- GOOGLE SHEETS -->
-  <section class="section" id="section-sheets-setup">
-    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Sincronización automática</div><div class="sh-title">Google Sheets</div></div></div>
+  <section class="section" id="section-supabase-setup">
+    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Base de datos</div><div class="sh-title">Configuración Supabase</div></div></div>
     <div class="grid-2">
       <div class="card">
-        <div class="card-header"><h3>Instrucciones de configuración</h3></div>
-        <div class="card-body" style="line-height:1.8;">
-          <div style="margin-bottom:12px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
+        <div class="card-header"><h3>Pasos de configuración</h3></div>
+        <div class="card-body" style="line-height:1.9;">
+          <div style="margin-bottom:11px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
             <strong style="font-family:var(--font-head);font-size:12px;color:var(--guinda);">PASO 1.</strong>
-            <span style="font-size:13px;color:var(--text2);"> Crea un Google Sheet llamado <em>"Red de Salud IPN"</em> con 3 hojas: <strong>Investigadores</strong>, <strong>Proyectos</strong>, <strong>Publicaciones</strong>.</span>
+            <span style="font-size:13px;color:var(--text2);"> Crea tu cuenta gratuita en <a href="https://supabase.com" target="_blank" style="color:var(--guinda);font-weight:600;">supabase.com</a> y crea un nuevo proyecto.</span>
           </div>
-          <div style="margin-bottom:12px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
+          <div style="margin-bottom:11px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
             <strong style="font-family:var(--font-head);font-size:12px;color:var(--guinda);">PASO 2.</strong>
-            <span style="font-size:13px;color:var(--text2);"> Ve a <em>Extensiones → Apps Script</em>. Pega el código de abajo. Haz clic en <em>Implementar → Nueva implementación → Aplicación web → Cualquier persona</em>.</span>
+            <span style="font-size:13px;color:var(--text2);"> En el dashboard de Supabase → <em>SQL Editor</em> → pega y ejecuta el archivo <strong>supabase_setup.sql</strong> que descargaste.</span>
           </div>
-          <div style="margin-bottom:12px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
+          <div style="margin-bottom:11px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
             <strong style="font-family:var(--font-head);font-size:12px;color:var(--guinda);">PASO 3.</strong>
-            <span style="font-size:13px;color:var(--text2);"> Copia la URL generada y pégala a la derecha. La sincronización será automática cada 60 segundos.</span>
+            <span style="font-size:13px;color:var(--text2);"> Ve a <em>Project Settings → API</em>. Copia la <strong>Project URL</strong> y la <strong>anon key</strong> (pública). Pégalas a la derecha.</span>
           </div>
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-family:monospace;font-size:10px;color:var(--text2);overflow:auto;max-height:160px;" id="apps-script-code"></div>
-          <button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="copyAppsScript()">📋 Copiar código Apps Script</button>
+          <div style="margin-bottom:11px;padding:12px;background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);">
+            <strong style="font-family:var(--font-head);font-size:12px;color:var(--guinda);">PASO 4.</strong>
+            <span style="font-size:13px;color:var(--text2);"> Ve a <em>Authentication → Users → Add user → Create new user</em>. Crea tu cuenta de administrador con tu correo Gmail y una contraseña segura.</span>
+          </div>
+          <div style="padding:12px;background:var(--gold-pale);border-left:3px solid var(--gold);border-radius:var(--radius);">
+            <strong style="font-family:var(--font-head);font-size:12px;color:var(--gold);">LISTO.</strong>
+            <span style="font-size:13px;color:var(--text2);"> Guarda las credenciales a la derecha. Después podrás iniciar sesión como administrador.</span>
+          </div>
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>Conectar con Google Sheets</h3></div>
+        <div class="card-header"><h3>Credenciales de Supabase</h3></div>
         <div class="card-body">
-          <div class="fg" style="margin-bottom:12px;"><label>URL de Apps Script</label><input type="url" id="sheets-url-input" placeholder="https://script.google.com/macros/s/…/exec"></div>
-          <button class="btn btn-guinda" style="width:100%;margin-bottom:12px;" onclick="saveSupabaseConfig()">✓ Guardar y probar conexión</button>
-          <div id="sheets-test-result"></div>
+          <div class="fg" style="margin-bottom:12px;">
+            <label>Project URL</label>
+            <input type="url" id="sb-url-input" placeholder="https://xxxxxxxxxxxx.supabase.co">
+          </div>
+          <div class="fg" style="margin-bottom:14px;">
+            <label>Anon Key (clave pública)</label>
+            <input type="text" id="sb-key-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+          </div>
+          <button class="btn btn-guinda" style="width:100%;margin-bottom:12px;" onclick="saveSupabaseConfig()">✓ Guardar y conectar</button>
+          <div id="sb-test-result"></div>
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
-            <div style="font-size:10.5px;font-family:var(--font-head);font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:7px;">URL configurada</div>
-            <div id="current-sheets-url" style="font-size:11px;color:var(--text2);word-break:break-all;background:var(--bg);padding:10px;border-radius:var(--radius);border:1px solid var(--border);font-family:monospace;"></div>
-            <div style="display:flex;gap:8px;margin-top:12px;">
-              <button class="btn btn-outline btn-sm" onclick="syncToSupabase()">↺ Recargar datos</button>
-              <button class="btn btn-gold btn-sm" onclick="syncToSupabase()">✓ Forzar actualización</button>
-            </div>
+            <div style="font-size:10.5px;font-family:var(--font-head);font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:7px;">Estado actual</div>
+            <div id="sb-current-url" style="font-size:11px;color:var(--text2);word-break:break-all;background:var(--bg);padding:10px;border-radius:var(--radius);border:1px solid var(--border);font-family:monospace;margin-bottom:8px;"></div>
+            <button class="btn btn-outline btn-sm" onclick="clearSupabaseConfig()" style="color:var(--text3);border-color:var(--border2);">✕ Limpiar configuración</button>
           </div>
         </div>
       </div>
