@@ -2272,6 +2272,7 @@ function exportCSVProjects(){const rows=[['ID','Título','Estado','Financiamient
 
 function notify(msg){const n=document.getElementById('notification');document.getElementById('notification-text').textContent=msg;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),3200);}
 
+let _pdfLibReady=false,_pdfLibLoading=false;
 function loadPdfLib(cb){if(_pdfLibReady){cb();return;}if(_pdfLibLoading){setTimeout(()=>loadPdfLib(cb),300);return;}_pdfLibLoading=true;const s=document.createElement('script');s.type='text/javascript';s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';s.onload=()=>{try{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';_pdfLibReady=true;cb();}catch(e){_pdfLibLoading=false;cb(e);}};s.onerror=()=>{_pdfLibLoading=false;cb(new Error('Error cargando pdf.js'));};document.head.appendChild(s);}
 
 async function extractTextFromPDF(buf){const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;let items=[];for(let p=1;p<=pdf.numPages;p++){const pg=await pdf.getPage(p);const tc=await pg.getTextContent();tc.items.forEach(it=>{if(it.str&&it.str.trim())items.push(it.str.trim());});items.push('|||PAGE|||');}return items;}
