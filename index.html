@@ -2277,57 +2277,136 @@ function loadPdfLib(cb){if(_pdfLibReady){cb();return;}if(_pdfLibLoading){setTime
 
 async function extractTextFromPDF(buf){const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;let items=[];for(let p=1;p<=pdf.numPages;p++){const pg=await pdf.getPage(p);const tc=await pg.getTextContent();tc.items.forEach(it=>{if(it.str&&it.str.trim())items.push(it.str.trim());});items.push('|||PAGE|||');}return items;}
 
+// ── Utilidad: convertir TEXTO EN MAYÚSCULAS a Formato Título ──
+function toTitleCase(str){
+  if(!str) return '';
+  const minus = ['de','del','la','las','los','el','y','e','en','con','a','para','por','o','u'];
+  const siglas = ['IPN','UNAM','CINVESTAV','IMSS','ISSSTE','ESM','ENCB','ENMH','CBG','CEPROBI','CIIDIR','CICATA','CICIMAR','CICS','ESCOM','UPIBI','UPIITA','UPIIZ','LICAM','SNI','CVU','ORCID','ADN','ARN','II','III','IV'];
+  return str.toLowerCase().split(/\s+/).map((w,i)=>{
+    const up = w.toUpperCase();
+    if(siglas.includes(up)) return up;
+    if(i>0 && minus.includes(w)) return w;
+    return w.split('-').map(part=>part.charAt(0).toUpperCase()+part.slice(1)).join('-');
+  }).join(' ').trim();
+}
+
+// ── Utilidad: generar correo institucional IPN ──
+// Formato: 1ra letra del nombre + primer apellido + 2 primeras letras del 2do apellido + @ipn.mx
+// Ej: "Miguel Ortiz Flores" → mortizfl@ipn.mx ; "Nayelli Najera Garcia" → nnajeraga@ipn.mx
+function generarCorreoIPN(nombreCompleto){
+  if(!nombreCompleto) return '';
+  const limpio = nombreCompleto.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const partes = limpio.trim().split(/\s+/).filter(w=>w.length>1);
+  if(partes.length < 2) return '';
+  let nombre, apellido1, apellido2;
+  if(partes.length >= 3){
+    nombre = partes[0];
+    apellido1 = partes[partes.length-2];
+    apellido2 = partes[partes.length-1];
+  } else {
+    nombre = partes[0];
+    apellido1 = partes[1];
+    apellido2 = '';
+  }
+  const correo = (nombre[0] + apellido1 + apellido2.substring(0,2)).toLowerCase();
+  return correo + '@ipn.mx';
+}
+
 function parseCVURizoma(items){
   const text=items.join(' ');const find=(rx,g=1)=>{const m=text.match(rx);return m?m[g].trim():'';};
+
+  // ── 1. NOMBRE (MAYÚSCULAS en CVU → Formato Título) ──
   let nombre='';const idxCVU=items.findIndex(s=>/NO\.?CVU/i.test(s));
   if(idxCVU>0){const cands=items.slice(Math.max(0,idxCVU-8),idxCVU).filter(s=>/^[A-ZÁÉÍÓÚÑÜ\s]+$/.test(s)&&s.length>2);nombre=cands.join(' ').replace(/\s+/g,' ').trim().replace(/PERFIL|RIZOMA|CIENCIA|TECNOLOG[IÍ]A|SECRETAR[IÍ]A|CVU/gi,'').trim();}
   if(!nombre){const m=text.match(/([A-ZÁÉÍÓÚÑÜ]{2,}\s+[A-ZÁÉÍÓÚÑÜ]{2,}(?:\s+[A-ZÁÉÍÓÚÑÜ]{2,}){0,4})\s+NO\.?CVU/i);if(m)nombre=m[1].trim();}
+  const nombreRaw = nombre;
+  nombre = toTitleCase(nombre);
+
   const cvu=find(/NO\.?CVU[:\s#]*(\d{4,10})/i)||find(/CVU[:\s#]*(\d{4,10})/i);
   const orcid=find(/(\d{4}-\d{4}-\d{4}-\d{3}[\dX])/i)||find(/ORC\s*ID[:\s]*([\d\-X]{16,20})/i);
-  const email=find(/([a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-  const sniMap={'1':'Nivel I','2':'Nivel II','3':'Nivel III','CANDIDATO':'Candidato','EMÉRITO':'Emérito','EMERITO':'Emérito'};
-  let sni='No aplica';const idxSNI=items.findIndex(s=>/^SNI$/i.test(s));
-  if(idxSNI>=0){const v=(items[idxSNI+1]||'').trim().toUpperCase();sni=sniMap[v]||'Nivel '+v||'No aplica';}else{const m=text.match(/LOGROS[\s\S]{0,30}SNI\s*(\d+|CANDIDATO|EM[EÉ]RITO)/i);if(m)sni=sniMap[m[1].toUpperCase()]||'Nivel '+m[1];}
-  // Institución
-  let inst='';const idxEmp=items.findIndex(s=>/EMPLEO ACTUAL/i.test(s));
-  if(idxEmp>=0){const ch=items.slice(idxEmp+1,idxEmp+8).join(' ');const m=ch.match(/(INSTITUTO[\w\s]+NACIONAL|UNAM|CINVESTAV|IMSS|[\w\s]+POLITEC[\w\s]+)/i);if(m)inst=m[1].trim();}
+
+  // ── 2. CORREO INSTITUCIONAL (generado, no el del CVU) ──
+  const email = generarCorreoIPN(nombreRaw);
+
+  // ── SNI (de DISTINCIONES: "SNI 2", "SNI 1", "CANDIDATO") ──
+  const sniMap={'1':'Nivel I','2':'Nivel II','3':'Nivel III'};
+  let sni='No aplica';
+  const sniMatches=[...text.matchAll(/\bSNI\s*(\d)\b/gi)];
+  if(sniMatches.length){
+    const maxNivel=Math.max(...sniMatches.map(m=>parseInt(m[1])));
+    sni=sniMap[String(maxNivel)]||'No aplica';
+  } else if(/\bCANDIDATO\b/i.test(text)&&/SECIHTI|SNI|CONACYT|CONAHCYT/i.test(text)){
+    sni='Candidato';
+  }
+
+  // ── 4. INSTITUCIÓN (limpia, sin puesto ni "tiempo completo") ──
+  let inst='';
+  const idxEmp=items.findIndex(s=>/EMPLEO ACTUAL/i.test(s));
+  if(idxEmp>=0){
+    for(let k=idxEmp+1;k<Math.min(idxEmp+10,items.length);k++){
+      const it=(items[k]||'').trim();
+      if(/PROFESOR|INVESTIGADOR|T[IÍ]TULAR|ASOCIADO|TIEMPO COMPLETO|MEDIO TIEMPO|PRESENTE|^\d{4}-/i.test(it)) continue;
+      if(/INSTITUTO POLIT[EÉ]CNICO NACIONAL/i.test(it)){inst='Instituto Politécnico Nacional';break;}
+      if(/UNIVERSIDAD NACIONAL AUT[OÓ]NOMA/i.test(it)){inst='Universidad Nacional Autónoma de México';break;}
+      if(/CINVESTAV/i.test(it)){inst='CINVESTAV';break;}
+      if(/^INSTITUTO[\w\sÁÉÍÓÚÑ]+/i.test(it) && it.length<60){inst=toTitleCase(it);break;}
+    }
+  }
   if(!inst&&/INSTITUTO POLITECNICO NACIONAL/i.test(text))inst='Instituto Politécnico Nacional';
-  // Unidad académica IPN
-  const unitMatch=text.match(/(?:ENCB|ESM|ENMH|CBG|CEPROBI|CIIDIR|CICATA|CICIMAR|CICS|CIECAS|CIIEMAD|CITEDI|ENCB|ESEO|UPIBI|UPIITA|UPIIZ|ESCOM|CINVESTAV)/i);
-  const unit = unitMatch ? unitMatch[0].toUpperCase() : '';
-  // Área/disciplina
-  let area='',disc='',subdisc='';
-  const iA=items.findIndex(s=>/^ÁREA[:\s]*$/i.test(s)||/^AREA[:\s]*$/i.test(s));if(iA>=0)area=(items[iA+1]||'').replace(/^[:]\s*/,'').trim();
-  const iD=items.findIndex(s=>/^DISCIPLINA[:\s]*$/i.test(s));if(iD>=0)disc=(items[iD+1]||'').replace(/^[:]\s*/,'').trim();
-  const iS=items.findIndex(s=>/SUB\s*DISCIPLINA/i.test(s));if(iS>=0)subdisc=(items[iS+1]||'').replace(/^[:]\s*/,'').trim();
-  if(!disc)disc=find(/DISCIPLINA[:\s]+([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ\s]{3,40})(?=\s+SUB|\s+ÁREA|\s+CAMPO)/i);
-  // Bio
+
+  // ── Unidad académica IPN ──
+  const unitMatch=text.match(/\b(?:ENCB|ESM|ENMH|CBG|CEPROBI|CIIDIR|CICATA|CICIMAR|CICS|CIECAS|CIIEMAD|CITEDI|ESEO|UPIBI|UPIITA|UPIIZ|ESCOM)\b/i);
+  let unit = unitMatch ? unitMatch[0].toUpperCase() : '';
+  if(!unit){
+    if(/ESCUELA SUPERIOR DE MEDICINA/i.test(text)) unit='ESM';
+    else if(/ESCUELA NACIONAL DE CIENCIAS BIOL[OÓ]GICAS/i.test(text)) unit='ENCB';
+  }
+
+  // ── 5. ÁREA DE CONOCIMIENTO → LÍNEAS DE INVESTIGACIÓN ──
+  // En el CVU los pares vienen como "ÁREA: MEDICINA Y CIENCIAS DE LA SALUD" (etiqueta+valor en el mismo item)
+  const extractField=(label)=>{
+    const it = items.find(s=>new RegExp('^'+label+'\\s*:','i').test((s||'').trim()));
+    if(it){ return it.replace(new RegExp('^'+label+'\\s*:','i'),'').trim(); }
+    const idx = items.findIndex(s=>new RegExp('^'+label+'\\s*:?\\s*$','i').test((s||'').trim()));
+    if(idx>=0 && items[idx+1]) return items[idx+1].replace(/^:\s*/,'').trim();
+    return '';
+  };
+  let area = extractField('ÁREA') || extractField('AREA');
+  let campo = extractField('CAMPO');
+  let disc = extractField('DISCIPLINA');
+  let subdisc = extractField('SUB\\s*DISCIPLINA') || extractField('SUBDISCIPLINA');
+  // Cuando ÁREA y CAMPO vienen en el mismo item: "MEDICINA Y CIENCIAS DE LA SALUD CAMPO: CIENCIAS MÉDICAS"
+  if(!campo){ const cm=area.match(/CAMPO\s*:\s*(.+)$/i); if(cm) campo=cm[1].trim(); }
+  if(!subdisc){ const sm=disc.match(/SUB\s*DISCIPLINA\s*:\s*(.+)$/i); if(sm) subdisc=sm[1].trim(); }
+  // Limpiar arrastre de etiquetas contiguas
+  area = area.replace(/\s*CAMPO\s*:.*/i,'').trim();
+  campo = campo.replace(/\s*DISCIPLINA\s*:.*/i,'').trim();
+  disc = disc.replace(/\s*SUB\s*DISCIPLINA\s*:.*/i,'').trim();
+
+  // ── Bio / Semblanza (del PERFIL) ──
   let bio='';const iP=items.findIndex(s=>/^PERFIL$/i.test(s)),iI=items.findIndex(s=>/INFORMACI[OÓ]N GENERAL/i.test(s));
   if(iP>=0&&iI>iP)bio=items.slice(iP+1,iI).join(' ').replace(/\s+/g,' ').trim();
   if(!bio)bio=text.split(/\n{2,}/).sort((a,b)=>b.length-a.length)[0]?.substring(0,800)||'';
   bio=bio.substring(0,700);
-  // Artículos
-  const dois=[...text.matchAll(/DOI[:\s]+(10\.\d{4,}\/[\w\.\-\/]+)/gi)];
-  const anos=[...text.matchAll(/A[ÑN]O[:\s]+(\d{4})/gi)];
+
+  // ── Mapeo de área principal (para el selector) ──
+  const blob=(area+' '+campo+' '+disc+' '+subdisc).toLowerCase();
+  const areaMap=[[/farmacol|molecul|biolog|bioqu|gen[oó]m|qu[ií]m|fisiolog/i,'Básica'],[/epidem/i,'Epidemiología'],[/salud p[uú]bl|comunit/i,'Salud Pública'],[/cl[ií]nic|m[eé]dic/i,'Clínica'],[/nutrici/i,'Nutrición'],[/conduct|psic/i,'Conducta']];
+  let areaSelect='Clínica';for(const[rx,v]of areaMap){if(rx.test(blob)){areaSelect=v;break;}}
+
+  const areaCompleta=[area,campo,disc,subdisc].filter(Boolean).map(toTitleCase).join(' › ');
+
+  // ── LÍNEAS = del área de conocimiento (descartar valores genéricos "Otras") ──
+  const lineasCand=[disc,subdisc,campo].filter(Boolean)
+    .filter(s=>!/^otras?(\s+especialidades\s+m[eé]dicas)?$/i.test(s.trim()))
+    .map(toTitleCase);
+  const lines = lineasCand.length ? [...new Set(lineasCand)].slice(0,4)
+               : [campo,area].filter(Boolean).map(toTitleCase).slice(0,2);
+
+  // ── 3. ARTÍCULOS: NO se extraen del CVU (se jalan de ORCID) ──
   const articulos=[];
-  dois.forEach((dm,i)=>{
-    const doi=dm[1].trim(),pos=dm.index;let year=2020;
-    for(let j=anos.length-1;j>=0;j--){if(anos[j].index<pos){year=parseInt(anos[j][1]);break;}}
-    const zone=text.substring(Math.max(0,pos-400),pos);
-    const tm=zone.match(/([A-ZÁÉÍÓÚÑÜ\(\)][A-ZÁÉÍÓÚÑÜA-Za-z\s\-\(\):,\.\'\/]{25,220})(?=\s+(?:JOURNAL|REVISTA|MOLECULES|HELIYON|INORGANICS|NUTRIENTS|SCIENCE|MEDICINE|PHARMACOL|NEUROBIOL|CLINICAL|FOOD|MODELL|BIOORGANIC|EUROPEAN|INTERNATIONAL|INFORMATICS|AÑO))/i);
-    const title=tm?tm[1].replace(/\s+/g,' ').trim():`Publicación ${i+1}`;
-    const rm=zone.match(/(JOURNAL[\w\s]+|MOLECULES|HELIYON|INORGANICS|NUTRIENTS|[\w\s]+SCIENCE|[\w\s]+MEDICINE|[\w\s]+PHARMACOL[\w\s]*|NEUROBIOLOGY|INFORMATICS[\w\s]+|BIOORGANIC[\w\s]+|EUROPEAN[\w\s]+)/i);
-    const am=text.substring(pos,pos+300).match(/AUTOR\(ES\)[:\s]+([^\n]{10,200})/i);
-    const authors=am?am[1].replace(/\s+/g,' ').trim().substring(0,120):nombre;
-    const tc2=text.substring(Math.max(0,pos-600),pos);
-    const type=/CAP[IÍ]TULO/i.test(tc2)?'Capítulo':/DIFUSI[OÓ]N/i.test(tc2)?'Difusión':'Artículo';
-    if(title&&!articulos.find(a=>a.doi===doi))articulos.push({id:100+i,title,type,year,authors,journal:rm?rm[1].trim():'',doi,if:'',url:'https://doi.org/'+doi});
-  });
-  const areaMap=[[/farmacol|molecul|biol|bioqu|gen[oó]m|qu[ií]m|fisiolog/i,'Básica'],[/epidem/i,'Epidemiología'],[/salud p[uú]bl|comunit/i,'Salud Pública'],[/cl[ií]nic|medicina/i,'Clínica'],[/nutrici/i,'Nutrición'],[/conduct|psic/i,'Conducta']];
-  let areaSelect='Básica';for(const[rx,v]of areaMap){if(rx.test(disc||area)){areaSelect=v;break;}}
-  const areaCompleta=[area,disc,subdisc].filter(Boolean).join(' › ');
-  const lines=[disc,subdisc].filter(Boolean).map(s=>s.charAt(0).toUpperCase()+s.slice(1).toLowerCase()).filter(Boolean).slice(0,4);
-  return{nombre,cvu,orcid,email,sni,inst,unit,area:areaSelect,areaCompleta,disciplina:disc,subdisciplina:subdisc,bio,lines:[...new Set(lines)],articulos};
+
+  return{nombre,cvu,orcid,email,sni,inst,unit,area:areaSelect,areaCompleta,campo:toTitleCase(campo),disciplina:toTitleCase(disc),subdisciplina:toTitleCase(subdisc),bio,lines,articulos};
 }
 
 function handleCVUFile(input){
@@ -2351,10 +2430,13 @@ function handleCVUFile(input){
         if(d.lines.length)document.getElementById('cvu-lines').value=d.lines.join(', ');
         const sniSel=document.getElementById('cvu-sni');for(const o of sniSel.options){if(o.value===d.sni){sniSel.value=d.sni;break;}}
         document.getElementById('cvu-area').value=d.area||'Básica';
-        window._cvuArticulos=d.articulos;window._cvuAreaCompleta=d.areaCompleta;window._cvuDisciplina=d.disciplina;window._cvuSubdisciplina=d.subdisciplina;
-        const campos=[d.nombre&&'Nombre',d.cvu&&'CVU',d.orcid&&'ORCID',d.email&&'Email',d.unit&&'Unidad',d.sni!=='No aplica'&&'SNI',d.inst&&'Institución',d.bio&&'Semblanza',d.lines.length&&'Líneas',d.articulos.length&&`${d.articulos.length} artículos`].filter(Boolean);
+        window._cvuAreaCompleta=d.areaCompleta;window._cvuDisciplina=d.disciplina;window._cvuSubdisciplina=d.subdisciplina;
+        const campos=[d.nombre&&'Nombre',d.cvu&&'CVU',d.orcid&&'ORCID',d.email&&'Correo IPN',d.unit&&'Unidad',d.sni!=='No aplica'&&'SNI',d.inst&&'Institución',d.bio&&'Semblanza',d.lines.length&&'Líneas'].filter(Boolean);
+        const orcidNote = d.orcid
+          ? '<div style="font-size:11.5px;color:var(--guinda);margin-top:6px;">📚 Al guardar, las publicaciones se importarán automáticamente desde ORCID.</div>'
+          : '<div style="font-size:11.5px;color:#8B6914;margin-top:6px;">⚠ Sin ORCID detectado — no se podrán importar publicaciones automáticamente.</div>';
         document.getElementById('cvu-result-area').innerHTML=campos.length>=3
-          ?`<div class="cvu-ok"><div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#1E7D35;margin-bottom:6px;">✓ Extracción exitosa</div><div style="font-size:12px;color:var(--text2);">${campos.join(' · ')}</div><div style="font-size:11.5px;color:var(--text3);margin-top:6px;">Revisa y corrige los datos antes de guardar.</div></div>`
+          ?`<div class="cvu-ok"><div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#1E7D35;margin-bottom:6px;">✓ Extracción exitosa</div><div style="font-size:12px;color:var(--text2);">${campos.join(' · ')}</div>${orcidNote}<div style="font-size:11.5px;color:var(--text3);margin-top:6px;">Revisa y corrige los datos antes de guardar.</div></div>`
           :`<div class="cvu-warn"><div style="font-size:12.5px;color:#8B6914;">Extracción parcial — completa el formulario manualmente con los datos del PDF.</div></div>`;
         notify(`✓ ${campos.length} campos extraídos del CVU Rizoma`);
       }catch(ex){console.error(ex);document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-err" style="font-size:13px;">✕ Error al procesar el PDF. Captura los datos manualmente.</div>`;}
@@ -2430,6 +2512,7 @@ function deleteProject(id){ deleteProjectDB(id); }
 async function saveCVUResearcher(){
   const name=document.getElementById('cvu-name').value.trim();
   if(!name){alert('El nombre es obligatorio');return;}
+  const orcid=document.getElementById('cvu-orcid').value.trim();
   const data = {
     name,
     cvu:document.getElementById('cvu-number').value,
@@ -2440,7 +2523,7 @@ async function saveCVUResearcher(){
     disciplina:window._cvuDisciplina||'',
     subdisciplina:window._cvuSubdisciplina||'',
     sni:document.getElementById('cvu-sni').value,
-    orcid:document.getElementById('cvu-orcid').value,
+    orcid,
     email:document.getElementById('cvu-email').value,
     lines:document.getElementById('cvu-lines').value.split(',').map(s=>s.trim()).filter(Boolean),
     bio:document.getElementById('cvu-bio').value,
@@ -2448,19 +2531,31 @@ async function saveCVUResearcher(){
   };
   const ok = await saveResearcher(data);
   if(!ok) return;
-  // Guardar artículos extraídos del CVU en la BD
-  if(window._cvuArticulos && window._cvuArticulos.length){
-    let saved=0;
-    for(const a of window._cvuArticulos){
-      if(a.title && !appData.publications.find(p=>p.doi===a.doi)){
-        const r = await savePublication({...a, if:a.if||''});
-        if(r) saved++;
+
+  // ── Jalar publicaciones desde ORCID (no del CVU) ──
+  if(orcid){
+    notify('🔄 Importando publicaciones desde ORCID…');
+    try{
+      const works = await fetchORCIDWorks(orcid);
+      let saved=0;
+      for(const w of works){
+        if(w.title && !appData.publications.find(p=>p.doi && p.doi===w.doi)){
+          const r = await savePublication({
+            title:w.title, type:'Artículo', year:w.year||new Date().getFullYear(),
+            authors:name, journal:w.journal||'', doi:w.doi||'',
+            if:'', quartile:'', issn:'', url:w.url||''
+          });
+          if(r) saved++;
+        }
       }
+      if(saved>0) notify('✓ +'+saved+' publicaciones importadas desde ORCID');
+      else notify('✓ Investigador guardado (sin publicaciones nuevas en ORCID)');
+    }catch(e){
+      notify('⚠ No se pudieron importar publicaciones de ORCID (perfil privado o sin conexión)');
     }
-    if(saved>0) notify('✓ +'+saved+' publicaciones guardadas en la BD');
-    window._cvuArticulos=null;
   }
-  window._cvuAreaCompleta=null;window._cvuDisciplina=null;window._cvuSubdisciplina=null;
+
+  window._cvuAreaCompleta=null;window._cvuDisciplina=null;window._cvuSubdisciplina=null;window._cvuArticulos=null;
   ['cvu-name','cvu-number','cvu-institution','cvu-unit','cvu-orcid','cvu-email','cvu-lines','cvu-bio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
 }
 
