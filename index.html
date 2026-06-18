@@ -1531,11 +1531,15 @@ document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('cli
 
 // ═══════════════════════════════════════════════════════════
 // SUPABASE — CONFIGURACIÓN Y BACKEND
-// Usa la clave pública (anon key) — es seguro exponerla
-// La seguridad real está en las políticas RLS de Supabase
+// La anon key es pública por diseño — es seguro incrustarla.
+// La seguridad real está en las políticas RLS de Supabase:
+// los visitantes solo pueden LEER; escribir requiere login.
 // ═══════════════════════════════════════════════════════════
-let SUPABASE_URL = localStorage.getItem('sb_url') || '';
-let SUPABASE_KEY = localStorage.getItem('sb_key') || '';
+const SUPABASE_DEFAULT_URL = 'https://mltolbnerjkcvvgmglmd.supabase.co';
+const SUPABASE_DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sdG9sYm5lcmprY3Z2Z21nbG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2NTc4ODEsImV4cCI6MjA5NzIzMzg4MX0.6brJwO0jslR6yCe4Ykht6f4yBN8o1r6ZW9J2VkNVNFk';
+
+let SUPABASE_URL = localStorage.getItem('sb_url') || SUPABASE_DEFAULT_URL;
+let SUPABASE_KEY = localStorage.getItem('sb_key') || SUPABASE_DEFAULT_KEY;
 let db = null;
 let isAdmin = false;
 let currentUser = null;
@@ -2308,7 +2312,7 @@ function generarCorreoIPN(nombreCompleto){
     apellido1 = partes[1];
     apellido2 = '';
   }
-  const correo = (nombre[0] + apellido1 + apellido2.substring(0,1)).toLowerCase();
+  const correo = (nombre[0] + apellido1 + apellido2.substring(0,2)).toLowerCase();
   return correo + '@ipn.mx';
 }
 
