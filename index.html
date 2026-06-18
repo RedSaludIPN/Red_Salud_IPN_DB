@@ -2308,7 +2308,7 @@ function generarCorreoIPN(nombreCompleto){
     apellido1 = partes[1];
     apellido2 = '';
   }
-  const correo = (nombre[0] + apellido1 + apellido2.substring(0,2)).toLowerCase();
+  const correo = (nombre[0] + apellido1 + apellido2.substring(0,1)).toLowerCase();
   return correo + '@ipn.mx';
 }
 
