@@ -1620,7 +1620,8 @@ async function loadPublications() {
   if (error) { console.error('loadPublications:', error); return; }
   appData.publications = (data||[]).map(p => ({
     ...p,
-    if: p.impact_factor || ''
+    if: p.impact_factor || '',
+    network_authors: Array.isArray(p.network_authors) ? p.network_authors : []
   }));
 }
 
@@ -1730,18 +1731,82 @@ async function deleteProjectDB(id) {
 }
 
 // ── CRUD — Publicaciones ────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// SCIMAGO — Cuartiles automáticos por revista
+// Carga scimago_db.json (mapa título→Q e ISSN→Q)
+// ═══════════════════════════════════════════════════════════
+let _scimagoDB = null, _scimagoLoading = false;
+async function loadScimagoDB(){
+  if(_scimagoDB || _scimagoLoading) return _scimagoDB;
+  _scimagoLoading = true;
+  try{
+    const res = await fetch('scimago_db.json');
+    if(res.ok){ _scimagoDB = await res.json(); }
+  }catch(e){ console.warn('Scimago DB no disponible:', e.message); }
+  _scimagoLoading = false;
+  return _scimagoDB;
+}
+function normalizeJournal(t){ return (t||'').toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
+// Devuelve el cuartil (Q1-Q4) de una revista por ISSN o nombre, o '' si no se encuentra
+async function lookupQuartile(journal, issn){
+  const dbS = await loadScimagoDB();
+  if(!dbS) return '';
+  if(issn){
+    const cleanIssn = issn.toString().trim().toUpperCase();
+    if(dbS.byIssn[cleanIssn]) return dbS.byIssn[cleanIssn];
+    // probar con guion si viene sin él
+    const digits = cleanIssn.replace(/[^0-9X]/g,'');
+    if(digits.length===8){
+      const fmt = digits.slice(0,4)+'-'+digits.slice(4);
+      if(dbS.byIssn[fmt]) return dbS.byIssn[fmt];
+    }
+  }
+  if(journal){
+    const nt = normalizeJournal(journal);
+    if(dbS.byTitle[nt]) return dbS.byTitle[nt];
+  }
+  return '';
+}
+
 async function savePublication(data) {
   if (!isAdmin || !db) { openLogin(); return null; }
+  // Auto-asignar cuartil desde Scimago si no se especificó
+  let quartile = data.quartile || '';
+  if(!quartile){
+    quartile = await lookupQuartile(data.journal, data.issn) || '';
+  }
   const record = {
     title: data.title, type: data.type,
     year: parseInt(data.year)||new Date().getFullYear(),
     authors: data.authors||'', journal: data.journal||'',
     doi: data.doi||'', impact_factor: data.if||'',
-    quartile: data.quartile||'', issn: data.issn||'', url: data.url||''
+    quartile, issn: data.issn||'', url: data.url||'',
+    network_authors: Array.isArray(data.networkAuthors) ? data.networkAuthors : []
   };
   const { error } = await db.from('publications').insert(record);
   if (error) { notify('✕ Error: ' + error.message); return null; }
-  notify('✓ Publicación registrada');
+  return true;
+}
+
+// ── Coautores: si el artículo ya existe (mismo DOI), añadir investigador a network_authors ──
+async function addCoauthorToPublication(doi, title, researcherName){
+  if(!doi && !title) return false;
+  // Buscar publicación existente por DOI (o por título si no hay DOI)
+  let existing = null;
+  if(doi){
+    existing = appData.publications.find(p => p.doi && p.doi.toLowerCase() === doi.toLowerCase());
+  }
+  if(!existing && title){
+    const nt = normalizeJournal(title);
+    existing = appData.publications.find(p => normalizeJournal(p.title) === nt);
+  }
+  if(!existing) return false;
+  // Añadir el investigador a network_authors si no está
+  const current = Array.isArray(existing.network_authors) ? existing.network_authors : [];
+  if(current.includes(researcherName)) return true; // ya estaba
+  const updated = [...current, researcherName];
+  const { error } = await db.from('publications').update({ network_authors: updated }).eq('id', existing.id);
+  if(error){ console.warn('No se pudo añadir coautor:', error.message); return false; }
   return true;
 }
 
@@ -1996,11 +2061,18 @@ function renderMetrics() {
   if (!arts.length) {
     topWrap.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>';
   } else {
-    // Contar por investigador registrado
+    // Contar por investigador: usar network_authors (coautores de la red) + fallback a texto de autores
     const counts = appData.researchers.map(r => {
+      const inNetwork = arts.filter(p =>
+        Array.isArray(p.network_authors) && p.network_authors.includes(r.name)
+      ).length;
+      // Fallback: si no hay network_authors, buscar apellido en el texto de autores
       const lastName = r.name.split(' ').filter(w=>w.length>2)[1] || r.name.split(' ')[0];
-      const n = arts.filter(p => p.authors && p.authors.toLowerCase().includes(lastName.toLowerCase())).length;
-      return { name: r.name, unit: r.unit||r.area||'', n };
+      const byText = arts.filter(p =>
+        (!p.network_authors || !p.network_authors.length) &&
+        p.authors && p.authors.toLowerCase().includes(lastName.toLowerCase())
+      ).length;
+      return { name: r.name, unit: r.unit||r.area||'', n: inNetwork + byText };
     }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n).slice(0,5);
 
     if (!counts.length) {
@@ -2138,10 +2210,12 @@ async function fetchORCIDWorks(orcid) {
   const res = await fetch(`https://pub.orcid.org/v3.0/${orcid}/works`, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error('ORCID error');
   const data = await res.json();
-  return (data.group||[]).slice(0,30).map(g => {
+  return (data.group||[]).slice(0,50).map(g => {
     const ws = g['work-summary']?.[0]; if (!ws) return null;
-    const doi = (ws['external-ids']?.['external-id']||[]).find(x=>x['external-id-type']==='doi')?.['external-id-value']||'';
-    return { title: ws.title?.title?.value||'Sin título', year: ws['publication-date']?.year?.value||'', journal: ws['journal-title']?.value||'', doi, url: doi?'https://doi.org/'+doi:(ws.url?.value||'') };
+    const ids = ws['external-ids']?.['external-id']||[];
+    const doi = ids.find(x=>x['external-id-type']==='doi')?.['external-id-value']||'';
+    const issn = ids.find(x=>x['external-id-type']==='issn')?.['external-id-value']||'';
+    return { title: ws.title?.title?.value||'Sin título', year: ws['publication-date']?.year?.value||'', journal: ws['journal-title']?.value||'', doi, issn, url: doi?'https://doi.org/'+doi:(ws.url?.value||'') };
   }).filter(Boolean);
 }
 
@@ -2169,13 +2243,19 @@ function filterProjects(s,btn) { document.querySelectorAll('.fc').forEach(c=>c.c
 function renderPublications(filtered = appData.publications) {
   const list = document.getElementById('pub-list');
   if (!filtered.length) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-title">Sin publicaciones registradas</div><div class="empty-desc">Las publicaciones se cargan desde ORCID al agregar investigadores.</div></div>'; return; }
-  list.innerHTML = filtered.map(p=>`
+  list.innerHTML = filtered.map(p=>{
+    const netAuthors = Array.isArray(p.network_authors) ? p.network_authors : [];
+    const coautoresHtml = netAuthors.length > 1
+      ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;"><span style="font-size:10px;color:var(--text3);font-family:var(--font-head);font-weight:700;">RED:</span>${netAuthors.map(n=>`<span style="font-size:10px;background:var(--guinda-pale);color:var(--guinda);padding:1px 7px;border-radius:3px;">${n.split(' ').slice(0,2).join(' ')}</span>`).join('')}</div>`
+      : '';
+    return `
     <div class="pub-item">
       <span class="pub-year">${p.year}</span>
       <div style="flex:1;">
         <div class="pub-title">${p.title}</div>
         <div class="pub-authors">${p.authors}</div>
         <div class="pub-journal">${p.journal}${p.if?' · IF: '+p.if:''}</div>
+        ${coautoresHtml}
         <div class="pub-actions">
           ${p.quartile?`<span class="q-pill ${p.quartile}">${p.quartile}</span>`:''}
           ${p.doi?`<a href="https://doi.org/${p.doi}" target="_blank" class="pl-link" style="font-size:10.5px;">DOI ↗</a>`:''}
@@ -2183,7 +2263,8 @@ function renderPublications(filtered = appData.publications) {
           <span class="rc-tag" style="font-size:10.5px;">${p.type}</span>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function filterPublications(q) { renderPublications(appData.publications.filter(p=>p.title.toLowerCase().includes(q.toLowerCase())||p.authors.toLowerCase().includes(q.toLowerCase()))); }
@@ -2540,20 +2621,36 @@ async function saveCVUResearcher(){
   if(orcid){
     notify('🔄 Importando publicaciones desde ORCID…');
     try{
+      // Refrescar publicaciones actuales para detectar duplicados/coautorías
+      await loadPublications();
       const works = await fetchORCIDWorks(orcid);
-      let saved=0;
+      let nuevas=0, coautorias=0;
       for(const w of works){
-        if(w.title && !appData.publications.find(p=>p.doi && p.doi===w.doi)){
+        if(!w.title) continue;
+        // ¿Ya existe este artículo (por DOI o título)?
+        const yaExiste = (w.doi && appData.publications.find(p=>p.doi && p.doi.toLowerCase()===w.doi.toLowerCase()))
+                      || appData.publications.find(p=>normalizeJournal(p.title)===normalizeJournal(w.title));
+        if(yaExiste){
+          // Artículo compartido → añadir este investigador como coautor de la red
+          const added = await addCoauthorToPublication(w.doi, w.title, name);
+          if(added) coautorias++;
+        }else{
+          // Artículo nuevo → guardarlo con este investigador como primer coautor de la red
           const r = await savePublication({
             title:w.title, type:'Artículo', year:w.year||new Date().getFullYear(),
-            authors:name, journal:w.journal||'', doi:w.doi||'',
-            if:'', quartile:'', issn:'', url:w.url||''
+            authors:w.authors||name, journal:w.journal||'', doi:w.doi||'',
+            if:'', quartile:'', issn:w.issn||'', url:w.url||'',
+            networkAuthors:[name]
           });
-          if(r) saved++;
+          if(r){ nuevas++; await loadPublications(); } // recargar para que el siguiente detecte coautoría
         }
       }
-      if(saved>0) notify('✓ +'+saved+' publicaciones importadas desde ORCID');
-      else notify('✓ Investigador guardado (sin publicaciones nuevas en ORCID)');
+      let msg='✓ ';
+      if(nuevas>0) msg+=nuevas+' publicaciones nuevas';
+      if(nuevas>0 && coautorias>0) msg+=' · ';
+      if(coautorias>0) msg+=coautorias+' coautorías registradas';
+      if(nuevas===0 && coautorias===0) msg+='Investigador guardado (sin publicaciones nuevas en ORCID)';
+      notify(msg);
     }catch(e){
       notify('⚠ No se pudieron importar publicaciones de ORCID (perfil privado o sin conexión)');
     }
@@ -2570,6 +2667,7 @@ async function saveCVUResearcher(){
   renderDashboard();
   renderMetrics();
   updateCurrentUrl();
+  loadScimagoDB(); // precargar tabla de cuartiles en segundo plano
 
   if (SUPABASE_URL && SUPABASE_KEY) {
     // Ya hay credenciales guardadas → conectar
