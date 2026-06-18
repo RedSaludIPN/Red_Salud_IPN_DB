@@ -1209,9 +1209,13 @@ body {
         </div>
       </div>
     </div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><h3>🔗 Colaboraciones Internas de la Red</h3><span style="font-size:10.5px;color:var(--text3);font-family:var(--font-body);">Detectadas automáticamente por coautorías</span></div>
+      <div class="card-body" id="internal-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se calculan automáticamente cuando dos miembros comparten un artículo.</div></div></div>
+    </div>
     <div class="grid-2">
-      <div class="card"><div class="card-header"><h3>🇲🇽 Colaboraciones Nacionales</h3></div><div class="card-body" id="national-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Sin colaboraciones registradas.</div></div></div></div>
-      <div class="card"><div class="card-header"><h3>🌍 Colaboraciones Internacionales</h3></div><div class="card-body" id="international-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Sin colaboraciones registradas.</div></div></div></div>
+      <div class="card"><div class="card-header"><h3>🇲🇽 Colaboraciones Nacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · Crossref</span></div><div class="card-body" id="national-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores al cargar CVUs.</div></div></div></div>
+      <div class="card"><div class="card-header"><h3>🌍 Colaboraciones Internacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · Crossref</span></div><div class="card-body" id="international-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores al cargar CVUs.</div></div></div></div>
     </div>
   </section>
 
@@ -1387,7 +1391,7 @@ body {
       <div class="form-row full"><div class="fg"><label>Revista / Editorial</label><input type="text" id="pub-journal" placeholder="Nombre de la revista o editorial"></div></div>
       <div class="form-row"><div class="fg"><label>DOI</label><input type="text" id="pub-doi" placeholder="10.xxxx/…"></div><div class="fg"><label>Factor de impacto</label><input type="text" id="pub-if" placeholder="Ej: 4.2"></div></div>
       <div class="form-row"><div class="fg"><label>Cuartil (Scimago / JCR)</label><select id="pub-quartile"><option value="">Sin clasificar</option><option value="Q1">Q1 — Primer cuartil</option><option value="Q2">Q2 — Segundo cuartil</option><option value="Q3">Q3 — Tercer cuartil</option><option value="Q4">Q4 — Cuarto cuartil</option><option value="NI">NI — No indexada</option></select></div><div class="fg"><label>ISSN</label><input type="text" id="pub-issn" placeholder="XXXX-XXXX"></div></div>
-      <div class="form-row full"><div class="fg"><label>URL del artículo</label><input type="url" id="pub-url" placeholder="https://doi.org/…"></div></div>
+      <div class="form-row full"><div class="fg"><label>URL del PDF (opcional)</label><input type="url" id="pub-pdf" placeholder="Enlace directo al PDF del artículo, si lo tienes"></div></div>
       <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:8px;">
         <button class="btn btn-outline" onclick="closeModal('modal-publication')">Cancelar</button>
         <button class="btn btn-guinda" onclick="addPublication()">Guardar publicación</button>
@@ -1621,6 +1625,7 @@ async function loadPublications() {
   appData.publications = (data||[]).map(p => ({
     ...p,
     if: p.impact_factor || '',
+    pdf_url: p.pdf_url || '',
     network_authors: Array.isArray(p.network_authors) ? p.network_authors : []
   }));
 }
@@ -1780,7 +1785,9 @@ async function savePublication(data) {
     year: parseInt(data.year)||new Date().getFullYear(),
     authors: data.authors||'', journal: data.journal||'',
     doi: data.doi||'', impact_factor: data.if||'',
-    quartile, issn: data.issn||'', url: data.url||'',
+    quartile, issn: data.issn||'',
+    url: data.url||'',
+    pdf_url: data.pdfUrl||'',
     network_authors: Array.isArray(data.networkAuthors) ? data.networkAuthors : []
   };
   const { error } = await db.from('publications').insert(record);
@@ -2259,7 +2266,8 @@ function renderPublications(filtered = appData.publications) {
         <div class="pub-actions">
           ${p.quartile?`<span class="q-pill ${p.quartile}">${p.quartile}</span>`:''}
           ${p.doi?`<a href="https://doi.org/${p.doi}" target="_blank" class="pl-link" style="font-size:10.5px;">DOI ↗</a>`:''}
-          ${p.url?`<a href="${p.url}" target="_blank" class="pl-link" style="font-size:10.5px;">Ver ↗</a>`:''}
+          ${(p.pdf_url && p.pdf_url!=='https://doi.org/'+p.doi)?`<a href="${p.pdf_url}" target="_blank" class="pl-link" style="font-size:10.5px;">📄 PDF</a>`:''}
+          ${(!p.doi && p.url)?`<a href="${p.url}" target="_blank" class="pl-link" style="font-size:10.5px;">Ver ↗</a>`:''}
           <span class="rc-tag" style="font-size:10.5px;">${p.type}</span>
         </div>
       </div>
@@ -2311,31 +2319,211 @@ function renderNetwork() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════
+// CROSSREF — Detección de instituciones colaboradoras
+// Consulta por DOI los coautores y sus afiliaciones.
+// Clasifica nacional (México) vs internacional, excluye al IPN.
+// ═══════════════════════════════════════════════════════════
+
+// Detecta si una afiliación es del IPN (para excluirla)
+function esIPN(aff){
+  const t = aff.toLowerCase();
+  return /\b(ipn|polit[eé]cnico nacional|escuela superior de medicina|\bencb\b|\benmh\b|cinvestav no|centro de investigaci[oó]n en computaci[oó]n|cic ipn|upiita|upibi|cicata|ceprobi|ciidir)\b/.test(t)
+      || /instituto polit[eé]cnico nacional/.test(t);
+}
+
+// Determina el país de una afiliación (devuelve 'MX', nombre de país, o '')
+function paisDeAfiliacion(aff){
+  const t = aff.toLowerCase();
+  // México: por nombre explícito o por instituciones mexicanas conocidas
+  if(/\bm[eé]xico\b|\bmexico\b|\bmx\b/.test(t)) return 'MX';
+  const instMx = /\b(unam|cinvestav|uam|ipn|buap|udg|universidad de guadalajara|colmex|cide|conacyt|conahcyt|secihti|imss|issste|inper|incmnsz|instituto nacional de|hospital general de m[eé]xico|cibo|ciatej|ciad|ecosur|cicese|uaem|uanl|uaslp|uacj|universidad veracruzana|cinvestav)\b/;
+  if(instMx.test(t)) return 'MX';
+  // Países comunes (inglés y español)
+  const paises = [
+    [/\b(usa|united states|u\.s\.a|u\.s\.|estados unidos)\b/, 'Estados Unidos'],
+    [/\b(spain|españa|espana)\b/, 'España'],
+    [/\b(france|francia)\b/, 'Francia'],
+    [/\b(germany|alemania|deutschland)\b/, 'Alemania'],
+    [/\b(united kingdom|u\.k\.|\buk\b|england|inglaterra|reino unido)\b/, 'Reino Unido'],
+    [/\b(canada|canadá)\b/, 'Canadá'],
+    [/\b(brazil|brasil)\b/, 'Brasil'],
+    [/\b(argentina)\b/, 'Argentina'],
+    [/\b(chile)\b/, 'Chile'],
+    [/\b(colombia)\b/, 'Colombia'],
+    [/\b(italy|italia)\b/, 'Italia'],
+    [/\b(japan|japón|japon)\b/, 'Japón'],
+    [/\b(china)\b/, 'China'],
+    [/\b(india)\b/, 'India'],
+    [/\b(netherlands|holanda|países bajos)\b/, 'Países Bajos'],
+    [/\b(switzerland|suiza)\b/, 'Suiza'],
+    [/\b(australia)\b/, 'Australia'],
+    [/\b(portugal)\b/, 'Portugal'],
+    [/\b(belgium|bélgica|belgica)\b/, 'Bélgica'],
+    [/\b(sweden|suecia)\b/, 'Suecia']
+  ];
+  for(const [rx,pais] of paises){ if(rx.test(t)) return pais; }
+  return ''; // país no determinado
+}
+
+// Limpia el nombre de la institución (toma la parte más significativa)
+function limpiarInstitucion(aff){
+  const segs = aff.split(/[,;]/).map(s=>s.trim()).filter(Boolean);
+  // Prioridad 1: universidad / institute / cinvestav / hospital (la entidad madre)
+  let clave = segs.find(s=>/\b(universi|institut|cinvestav|imss|colegio|college)\b/i.test(s)
+                          && !/facultad|department|departamento|school of|escuela de|faculty/i.test(s));
+  // Prioridad 2: hospital o centro
+  if(!clave) clave = segs.find(s=>/hospital|centro|center/i.test(s));
+  // Prioridad 3: cualquier segmento con universidad/instituto aunque tenga facultad
+  if(!clave) clave = segs.find(s=>/universi|institut/i.test(s));
+  // Último recurso: primer segmento
+  let nombre = clave || segs[0] || aff;
+  return nombre.trim().substring(0,80);
+}
+
+// Consulta Crossref por DOI y devuelve instituciones externas (no-IPN) con su país
+async function fetchCrossrefAffiliations(doi){
+  if(!doi) return [];
+  try{
+    const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}?mailto=redsalud@ipn.mx`);
+    if(!res.ok) return [];
+    const data = await res.json();
+    const authors = data.message?.author || [];
+    const result = [];
+    const seen = new Set();
+    authors.forEach(a => {
+      (a.affiliation||[]).forEach(af => {
+        const name = af.name || '';
+        if(!name || esIPN(name)) return; // excluir IPN
+        const inst = limpiarInstitucion(name);
+        const key = inst.toLowerCase();
+        if(seen.has(key)) return;
+        seen.add(key);
+        result.push({ inst, pais: paisDeAfiliacion(name), raw: name });
+      });
+    });
+    return result;
+  }catch(e){ return []; }
+}
+
+// Procesa los artículos de un investigador y registra colaboraciones externas
+async function detectarColaboracionesExternas(works, onProgress){
+  const nacionales = {}; // inst -> count
+  const internacionales = {}; // inst -> {count, pais}
+  let procesados = 0;
+  // Limitar a los primeros 25 DOIs para no saturar (Crossref + tiempo)
+  const conDoi = works.filter(w=>w.doi).slice(0,25);
+  for(const w of conDoi){
+    const affs = await fetchCrossrefAffiliations(w.doi);
+    affs.forEach(a => {
+      if(a.pais === 'MX'){
+        nacionales[a.inst] = (nacionales[a.inst]||0) + 1;
+      } else if(a.pais){
+        if(!internacionales[a.inst]) internacionales[a.inst] = {count:0, pais:a.pais};
+        internacionales[a.inst].count++;
+      }
+      // Si país indeterminado, lo omitimos (queda para revisión manual)
+    });
+    procesados++;
+    if(onProgress) onProgress(procesados, conDoi.length);
+    await new Promise(r=>setTimeout(r, 120)); // cortesía con la API
+  }
+  return { nacionales, internacionales };
+}
+
+// Guarda/actualiza colaboraciones externas en Supabase
+async function guardarColaboraciones(detectadas){
+  if(!db || !isAdmin) return;
+  // Cargar colaboraciones existentes para no duplicar
+  await loadCollaborations();
+  const existentesNac = new Map(appData.collaborations.national.map(c=>[c.inst.toLowerCase(), c]));
+  const existentesInt = new Map(appData.collaborations.international.map(c=>[c.inst.toLowerCase(), c]));
+
+  // Nacionales
+  for(const [inst, count] of Object.entries(detectadas.nacionales)){
+    const key = inst.toLowerCase();
+    if(existentesNac.has(key)){
+      const c = existentesNac.get(key);
+      await db.from('collaborations').update({ projects_count: (c.projects_count||0) + count }).eq('id', c.id);
+    } else {
+      await db.from('collaborations').insert({ inst, city:'', country:'México', type:'national', projects_count: count });
+    }
+  }
+  // Internacionales
+  for(const [inst, info] of Object.entries(detectadas.internacionales)){
+    const key = inst.toLowerCase();
+    if(existentesInt.has(key)){
+      const c = existentesInt.get(key);
+      await db.from('collaborations').update({ projects_count: (c.projects_count||0) + info.count }).eq('id', c.id);
+    } else {
+      await db.from('collaborations').insert({ inst, city:'', country:info.pais, type:'international', projects_count: info.count });
+    }
+  }
+}
+
+// ── Calcular colaboraciones INTERNAS de la red (coautorías entre miembros) ──
+function computeInternalCollaborations(){
+  // Cada artículo con 2+ coautores de la red genera vínculos entre ellos
+  const pairs = {}; // "A||B" -> count
+  const memberPubs = {}; // miembro -> set de DOIs/títulos
+  appData.publications.forEach(p => {
+    const authors = Array.isArray(p.network_authors) ? p.network_authors : [];
+    if(authors.length < 2) return;
+    const key = p.doi || p.title;
+    // Registrar todas las parejas
+    for(let i=0;i<authors.length;i++){
+      for(let j=i+1;j<authors.length;j++){
+        const pair = [authors[i],authors[j]].sort().join('||');
+        pairs[pair] = (pairs[pair]||0) + 1;
+      }
+      if(!memberPubs[authors[i]]) memberPubs[authors[i]] = new Set();
+      memberPubs[authors[i]].add(key);
+    }
+  });
+  const links = Object.entries(pairs).map(([pair,count])=>{
+    const [a,b] = pair.split('||');
+    return { a, b, count };
+  }).sort((x,y)=>y.count-x.count);
+  return { links, memberPubs };
+}
+
 function renderCollaborations() {
   const svg = document.getElementById('world-map');
-  if (!appData.collaborations.national.length && !appData.collaborations.international.length) {
+  const internal = computeInternalCollaborations();
+  const hasInternal = internal.links.length > 0;
+  const hasExternal = appData.collaborations.national.length || appData.collaborations.international.length;
+
+  if (!hasInternal && !hasExternal) {
     svg.innerHTML = `<rect width="900" height="450" fill="#F7F7F7"/><text x="450" y="225" text-anchor="middle" font-size="14" fill="#888" font-family="Arial">Sin colaboraciones registradas aún</text>`;
-    return;
+  } else {
+    const points = [
+      {x:175,y:220,type:'main',label:'Sede IPN',r:13},
+      ...appData.collaborations.national.slice(0,5).map((c,i)=>({x:165+i*10,y:225+i*8,type:'nat',label:(c.inst||'').substring(0,16),r:7})),
+      ...appData.collaborations.international.slice(0,6).map((c,i)=>({x:300+i*80,y:180+i*30,type:'intl',label:(c.inst||'').substring(0,12),r:7}))
+    ];
+    const col={main:'#6A1537',nat:'#1E7D35',intl:'#C8960C'};
+    svg.innerHTML=`<rect width="900" height="450" fill="#F3EDE3"/>
+      ${Array.from({length:23},(_,i)=>`<line x1="${i*40}" y1="0" x2="${i*40}" y2="450" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
+      ${Array.from({length:12},(_,i)=>`<line x1="0" y1="${i*40}" x2="900" y2="${i*40}" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
+      <ellipse cx="450" cy="225" rx="400" ry="180" fill="rgba(106,21,55,0.04)" stroke="rgba(106,21,55,0.08)" stroke-width="1"/>
+      ${points.slice(1).map(p=>`<line x1="175" y1="220" x2="${p.x}" y2="${p.y}" stroke="${col[p.type]}" stroke-width="1.2" stroke-dasharray="${p.type==='intl'?'5,3':'none'}" opacity="0.45"/>`).join('')}
+      ${points.map(p=>`<g><circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="${col[p.type]}" opacity="0.85" stroke="white" stroke-width="1.5"/>${p.r>8?`<text x="${p.x}" y="${p.y+p.r+12}" text-anchor="middle" font-size="9" fill="${col[p.type]}" font-family="Montserrat,Arial">${p.label}</text>`:''}</g>`).join('')}
+      <text x="14" y="438" font-size="9" fill="rgba(106,21,55,0.35)" font-family="Montserrat,Arial" letter-spacing="1">RED DE SALUD IPN · REI06-RSAL · COLABORACIONES</text>`;
   }
-  const points = [
-    {x:175,y:220,type:'main',label:'Sede IPN',r:13},
-    ...appData.collaborations.national.slice(0,5).map((c,i)=>({x:165+i*10,y:225+i*8,type:'nat',label:c.inst.substring(0,16),r:7})),
-    ...appData.collaborations.international.slice(0,6).map((c,i)=>({x:300+i*80,y:180+i*30,type:'intl',label:c.inst.substring(0,12),r:7}))
-  ];
-  const col={main:'#6A1537',nat:'#1E7D35',intl:'#C8960C'};
-  svg.innerHTML=`<rect width="900" height="450" fill="#F3EDE3"/>
-    ${Array.from({length:23},(_,i)=>`<line x1="${i*40}" y1="0" x2="${i*40}" y2="450" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
-    ${Array.from({length:12},(_,i)=>`<line x1="0" y1="${i*40}" x2="900" y2="${i*40}" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
-    <ellipse cx="450" cy="225" rx="400" ry="180" fill="rgba(106,21,55,0.04)" stroke="rgba(106,21,55,0.08)" stroke-width="1"/>
-    ${points.slice(1).map(p=>`<line x1="175" y1="220" x2="${p.x}" y2="${p.y}" stroke="${col[p.type]}" stroke-width="1.2" stroke-dasharray="${p.type==='intl'?'5,3':'none'}" opacity="0.45"/>`).join('')}
-    ${points.map(p=>`<g><circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="${col[p.type]}" opacity="0.85" stroke="white" stroke-width="1.5"/>${p.r>8?`<text x="${p.x}" y="${p.y+p.r+12}" text-anchor="middle" font-size="9" fill="${col[p.type]}" font-family="Montserrat,Arial">${p.label}</text>`:''}</g>`).join('')}
-    <text x="14" y="438" font-size="9" fill="rgba(106,21,55,0.35)" font-family="Montserrat,Arial" letter-spacing="1">RED DE SALUD IPN · REI06-RSAL · COLABORACIONES</text>`;
+
+  // ── Colaboraciones internas (coautorías entre miembros) ──
+  const intWrap = document.getElementById('internal-collabs');
+  if(intWrap){
+    intWrap.innerHTML = internal.links.length
+      ? internal.links.slice(0,15).map(l=>`<div class="info-row"><span class="ir-label" style="min-width:auto;flex:1;">${l.a.split(' ').slice(0,2).join(' ')} ↔ ${l.b.split(' ').slice(0,2).join(' ')}</span><span class="ir-value" style="font-size:12.5px;font-weight:700;color:var(--guinda);">${l.count} art.</span></div>`).join('')
+      : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Aún no hay coautorías entre miembros de la red. Se detectan automáticamente cuando dos investigadores comparten un artículo.</div></div>';
+  }
 
   document.getElementById('national-collabs').innerHTML = appData.collaborations.national.length
-    ? appData.collaborations.national.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.city||'México'} · ${c.projects||0} proyectos</span></div>`).join('')
+    ? appData.collaborations.national.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.city||'México'} · ${c.projects_count||c.projects||0} proyectos</span></div>`).join('')
     : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones nacionales registradas.</div></div>';
   document.getElementById('international-collabs').innerHTML = appData.collaborations.international.length
-    ? appData.collaborations.international.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.country||'—'} · ${c.projects||0} proyectos</span></div>`).join('')
+    ? appData.collaborations.international.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.country||'—'} · ${c.projects_count||c.projects||0} proyectos</span></div>`).join('')
     : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones internacionales registradas.</div></div>';
 }
 
@@ -2583,11 +2771,11 @@ async function addPublication(){
     if:document.getElementById('pub-if').value,
     quartile:document.getElementById('pub-quartile').value,
     issn:document.getElementById('pub-issn').value,
-    url:document.getElementById('pub-url').value
+    pdfUrl:document.getElementById('pub-pdf').value
   });
   if(ok){
     closeModal('modal-publication');
-    ['pub-title','pub-year','pub-authors','pub-journal','pub-doi','pub-if','pub-issn','pub-url'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['pub-title','pub-year','pub-authors','pub-journal','pub-doi','pub-if','pub-issn','pub-pdf'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   }
 }
 
@@ -2651,6 +2839,24 @@ async function saveCVUResearcher(){
       if(coautorias>0) msg+=coautorias+' coautorías registradas';
       if(nuevas===0 && coautorias===0) msg+='Investigador guardado (sin publicaciones nuevas en ORCID)';
       notify(msg);
+
+      // ── Detectar colaboraciones institucionales externas vía Crossref ──
+      notify('🔄 Analizando afiliaciones de coautores (Crossref)…');
+      try{
+        const detectadas = await detectarColaboracionesExternas(works, (done,total)=>{
+          if(done % 5 === 0) setSyncStatus('loading', `Analizando colaboraciones ${done}/${total}…`);
+        });
+        const nNac = Object.keys(detectadas.nacionales).length;
+        const nInt = Object.keys(detectadas.internacionales).length;
+        if(nNac || nInt){
+          await guardarColaboraciones(detectadas);
+          notify(`🌐 Colaboraciones detectadas: ${nNac} nacionales · ${nInt} internacionales`);
+        }
+        setSyncStatus('connected','Sincronizado');
+      }catch(e){
+        console.warn('Crossref:', e.message);
+        setSyncStatus('connected','Sincronizado');
+      }
     }catch(e){
       notify('⚠ No se pudieron importar publicaciones de ORCID (perfil privado o sin conexión)');
     }
