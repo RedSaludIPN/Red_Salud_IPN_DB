@@ -436,6 +436,22 @@ body {
 }
 .pl-link:hover { background: var(--guinda); color: #fff; }
 
+/* Panel expandible de investigador */
+.rc-detail-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 6px 0; border-bottom: 1px solid var(--guinda-soft);
+}
+.rc-detail-row:last-of-type { border-bottom: none; }
+.rc-detail-ic { font-size: 14px; flex-shrink: 0; width: 20px; text-align: center; }
+.rc-detail-lbl {
+  font-size: 9.5px; font-family: var(--font-head); font-weight: 700;
+  color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.rc-detail-val { font-size: 12.5px; color: var(--text); line-height: 1.4; }
+.rc-expand { transform: rotate(0deg); }
+.rc:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--guinda); }
+
+
 /* ── FILTERS ───────────────────────────────────────── */
 .filter-row {
   display: flex; gap: 8px; flex-wrap: wrap;
@@ -1016,8 +1032,8 @@ body {
     <div class="stat-grid">
       <div class="stat-card"><span class="sc-icon">📈</span><div class="sc-num" id="s-active">0</div><div class="sc-lbl">Proyectos activos</div></div>
       <div class="stat-card"><span class="sc-icon">🏛️</span><div class="sc-num" id="s-units">0</div><div class="sc-lbl">Unidades académicas</div></div>
-      <div class="stat-card"><span class="sc-icon">🤝</span><div class="sc-num">0</div><div class="sc-lbl">Colaboraciones intl.</div></div>
-      <div class="stat-card"><span class="sc-icon">🎓</span><div class="sc-num">0</div><div class="sc-lbl">Programas de posgrado</div></div>
+      <div class="stat-card"><span class="sc-icon">🤝</span><div class="sc-num" id="s-collabs">0</div><div class="sc-lbl">Colaboraciones</div></div>
+      <div class="stat-card"><span class="sc-icon">🔗</span><div class="sc-num" id="s-internal">0</div><div class="sc-lbl">Coautorías internas</div></div>
     </div>
 
     <!-- ── MÉTRICAS DE PUBLICACIONES ────────────────── -->
@@ -1129,6 +1145,7 @@ body {
       <button class="fc" onclick="filterByArea('Básica',this)">Básica</button>
       <button class="fc" onclick="filterByArea('Epidemiología',this)">Epidemiología</button>
       <button class="fc" onclick="filterByArea('Nutrición',this)">Nutrición</button>
+      <button class="fc" id="btn-group-exp" onclick="toggleGroupByExperience()" style="margin-left:auto;border-color:var(--gold);color:var(--gold);">🔬 Agrupar por experiencia</button>
     </div>
     <div class="researcher-grid" id="researcher-grid">
       <div class="empty-state" style="grid-column:1/-1;">
@@ -1185,13 +1202,11 @@ body {
     <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Interconexiones</div><div class="sh-title">Mapa de Red</div></div></div>
     <div class="card">
       <div class="card-body">
-        <div id="network-container"><canvas id="netCanvas" style="width:100%;height:100%;"></canvas></div>
-        <div class="map-legend mt-16">
-          <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);"></div>Investigador IPN</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#1E7D35;"></div>Colaborador nacional</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--gold);"></div>Colaborador internacional</div>
+        <div id="network-container"></div>
+        <div class="map-legend mt-16" id="network-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);"></div>Investigadores</div>
         </div>
-        <p style="font-size:11.5px;color:var(--text3);margin-top:7px;">El mapa se genera automáticamente conforme se agregan investigadores a la red.</p>
+        <p style="font-size:11.5px;color:var(--text3);margin-top:7px;">Los colores indican el área de investigación. Las líneas doradas conectan a miembros que han publicado juntos. Pasa el cursor sobre un nodo para ver detalles, o haz clic para abrir el perfil.</p>
       </div>
     </div>
   </section>
@@ -1278,6 +1293,7 @@ body {
           <div class="form-row"><div class="fg"><label>Institución</label><input type="text" id="cvu-institution" placeholder="ESM, ENCB, CIIDIR…"></div><div class="fg"><label>Unidad académica</label><input type="text" id="cvu-unit" placeholder="ESM, ENCB, CBG…"></div></div>
           <div class="form-row"><div class="fg"><label>ORCID</label><input type="text" id="cvu-orcid" placeholder="0000-0000-0000-0000"></div><div class="fg"><label>Nivel SNI</label><select id="cvu-sni"><option>Candidato</option><option>Nivel I</option><option>Nivel II</option><option>Nivel III</option><option>Emérito</option><option>No aplica</option></select></div></div>
           <div class="form-row"><div class="fg"><label>Área de investigación</label><select id="cvu-area"><option>Salud Pública</option><option>Clínica</option><option>Básica</option><option>Epidemiología</option><option>Nutrición</option><option>Conducta</option><option>Otra</option></select></div><div class="fg"><label>Email institucional</label><input type="email" id="cvu-email" placeholder="investigador@ipn.mx"></div></div>
+          <div class="form-row"><div class="fg"><label>Extensión IPN</label><input type="text" id="cvu-ext" placeholder="Ej: 62743"></div><div class="fg"></div></div>
           <div class="form-row full"><div class="fg"><label>Líneas de investigación (coma)</label><input type="text" id="cvu-lines" placeholder="Farmacología, Metabolismo, Oncología…"></div></div>
           <div class="form-row full"><div class="fg"><label>Semblanza académica</label><textarea id="cvu-bio" placeholder="Trayectoria, grados, producción…"></textarea></div></div>
           <button class="btn btn-guinda" style="width:100%" onclick="saveCVUResearcher()">✓ Guardar investigador en la Red</button>
@@ -1351,6 +1367,7 @@ body {
       <div class="form-row"><div class="fg"><label>Institución</label><input type="text" id="r-inst" placeholder="IPN – Escuela Superior de Medicina"></div><div class="fg"><label>Nivel SNI</label><select id="r-sni"><option>Candidato</option><option>Nivel I</option><option>Nivel II</option><option>Nivel III</option><option>Emérito</option><option>No aplica</option></select></div></div>
       <div class="form-row"><div class="fg"><label>ORCID</label><input type="text" id="r-orcid" placeholder="0000-0000-0000-0000"></div><div class="fg"><label>No. CVU Rizoma</label><input type="text" id="r-cvu" placeholder="Ej: 559655"></div></div>
       <div class="form-row"><div class="fg"><label>Área de investigación</label><select id="r-area"><option>Salud Pública</option><option>Clínica</option><option>Básica</option><option>Epidemiología</option><option>Nutrición</option><option>Conducta</option><option>Otra</option></select></div><div class="fg"><label>Email institucional</label><input type="email" id="r-email" placeholder="investigador@ipn.mx"></div></div>
+      <div class="form-row"><div class="fg"><label>Extensión IPN</label><input type="text" id="r-ext" placeholder="Ej: 62743"></div><div class="fg"></div></div>
       <div class="form-row full"><div class="fg"><label>Líneas de investigación (separadas por coma)</label><input type="text" id="r-lines" placeholder="Enfermedades crónicas, Farmacología…"></div></div>
       <div class="form-row full"><div class="fg"><label>Semblanza académica</label><textarea id="r-bio" placeholder="Trayectoria, grados obtenidos, área de especialidad…"></textarea></div></div>
       <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:8px;">
@@ -1452,6 +1469,42 @@ let appData = {
   publications: [],
   collaborations: { national: [], international: [] }
 };
+
+// ═══════════════════════════════════════════════════════════
+// UNIDADES ACADÉMICAS DEL IPN — nombres completos
+// ═══════════════════════════════════════════════════════════
+const UNIDADES_IPN = {
+  'ESM':     'Escuela Superior de Medicina',
+  'ENCB':    'Escuela Nacional de Ciencias Biológicas',
+  'ENMH':    'Escuela Nacional de Medicina y Homeopatía',
+  'ESEO':    'Escuela Superior de Enfermería y Obstetricia',
+  'CBG':     'Centro de Biotecnología Genómica',
+  'CEPROBI': 'Centro de Desarrollo de Productos Bióticos',
+  'CIIDIR':  'Centro Interdisciplinario de Investigación para el Desarrollo Integral Regional',
+  'CICATA':  'Centro de Investigación en Ciencia Aplicada y Tecnología Avanzada',
+  'CICIMAR': 'Centro Interdisciplinario de Ciencias Marinas',
+  'CICS':    'Centro Interdisciplinario de Ciencias de la Salud',
+  'CICS-UST':'Centro Interdisciplinario de Ciencias de la Salud Unidad Santo Tomás',
+  'CICS-MA': 'Centro Interdisciplinario de Ciencias de la Salud Unidad Milpa Alta',
+  'CIECAS':  'Centro de Investigaciones Económicas, Administrativas y Sociales',
+  'CIIEMAD': 'Centro Interdisciplinario de Investigaciones y Estudios sobre Medio Ambiente y Desarrollo',
+  'CITEDI':  'Centro de Investigación y Desarrollo de Tecnología Digital',
+  'UPIBI':   'Unidad Profesional Interdisciplinaria de Biotecnología',
+  'UPIITA':  'Unidad Profesional Interdisciplinaria en Ingeniería y Tecnologías Avanzadas',
+  'UPIIZ':   'Unidad Profesional Interdisciplinaria de Ingeniería Campus Zacatecas',
+  'ESCOM':   'Escuela Superior de Cómputo',
+  'ESIME':   'Escuela Superior de Ingeniería Mecánica y Eléctrica',
+  'ESIQIE':  'Escuela Superior de Ingeniería Química e Industrias Extractivas',
+  'ESFM':    'Escuela Superior de Física y Matemáticas',
+  'ENBA':    'Escuela Nacional de Biblioteconomía y Archivonomía',
+  'CINVESTAV':'Centro de Investigación y de Estudios Avanzados del IPN'
+};
+function nombreUnidad(sigla){
+  if(!sigla) return '';
+  const key = sigla.toString().toUpperCase().trim();
+  return UNIDADES_IPN[key] || sigla;
+}
+
 
 // ═══════════════════════════════════════════════════════════
 // NAVEGACIÓN Y CONTROL DE ACCESO
@@ -1603,7 +1656,9 @@ async function loadResearchers() {
   appData.researchers = (data||[]).map(r => ({
     ...r,
     lines: Array.isArray(r.lines) ? r.lines : [],
-    pubs: r.pubs || 0
+    pubs: r.pubs || 0,
+    ext: r.ext || '',
+    areaCompleta: r.area_completa || ''
   }));
 }
 
@@ -1685,7 +1740,7 @@ async function saveResearcher(data) {
     area: data.area, area_completa: data.areaCompleta||'',
     disciplina: data.disciplina||'', subdisciplina: data.subdisciplina||'',
     sni: data.sni, orcid: data.orcid||'', cvu: data.cvu||'',
-    email: data.email||'', bio: data.bio||'',
+    email: data.email||'', bio: data.bio||'', ext: data.ext||'',
     lines: Array.isArray(data.lines) ? data.lines : [],
     pubs: parseInt(data.pubs)||0,
     rizoma: data.rizoma||'https://rizoma.conacyt.mx/'
@@ -1956,6 +2011,13 @@ function renderDashboard() {
   document.getElementById('s-active').textContent = appData.projects.filter(p=>p.status==='Activo').length;
   const units = new Set(appData.researchers.map(r=>r.unit||r.inst).filter(Boolean));
   document.getElementById('s-units').textContent = units.size;
+  // Colaboraciones externas (nacionales + internacionales) y coautorías internas
+  const totalCollabs = (appData.collaborations.national?.length||0) + (appData.collaborations.international?.length||0);
+  const sCollabs = document.getElementById('s-collabs');
+  if(sCollabs) sCollabs.textContent = totalCollabs;
+  const internal = computeInternalCollaborations();
+  const sInternal = document.getElementById('s-internal');
+  if(sInternal) sInternal.textContent = internal.links.length;
 
   const dp = document.getElementById('dash-projects');
   dp.innerHTML = appData.projects.length ? appData.projects.slice(0,4).map(p=>`
@@ -2046,6 +2108,10 @@ function renderMetrics() {
   if (!arts.length) {
     yearChart.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>';
   } else {
+    // Promedio coherente: total de los últimos 5 años ÷ número de años con actividad
+    const totalUlt5 = yearCounts.reduce((s,yc)=>s+yc.n, 0);
+    const aniosConDatos = yearCounts.filter(yc=>yc.n>0).length || 1;
+    const promedio = (totalUlt5 / aniosConDatos).toFixed(1);
     yearChart.innerHTML = `
       <div class="year-chart">
         ${yearCounts.map(yc => `
@@ -2058,8 +2124,8 @@ function renderMetrics() {
           </div>`).join('')}
       </div>
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);display:flex;justify-content:space-between;">
-        <span>Total acumulado: <strong style="color:var(--guinda);">${arts.length}</strong></span>
-        <span>Prom/año: <strong style="color:var(--guinda);">${(arts.length/5).toFixed(1)}</strong></span>
+        <span>Total (5 años): <strong style="color:var(--guinda);">${totalUlt5}</strong></span>
+        <span>Prom/año activo: <strong style="color:var(--guinda);">${promedio}</strong></span>
       </div>`;
   }
 
@@ -2102,21 +2168,18 @@ function renderMetrics() {
   }
 }
 
-function renderResearchers(filtered = appData.researchers) {
-  const grid = document.getElementById('researcher-grid');
-  if (!filtered.length) {
-    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">🔍</div><div class="empty-title">Sin resultados</div><div class="empty-desc">No se encontraron investigadores con ese criterio.</div></div>';
-    return;
-  }
-  grid.innerHTML = filtered.map(r => `
-    <div class="rc" onclick="showResearcherDetail(${r.id})">
-      <div class="rc-header">
+function tarjetaInvestigador(r){
+  const unidadFull = r.unit ? nombreUnidad(r.unit) : '';
+  return `
+    <div class="rc" id="rc-${r.id}">
+      <div class="rc-header" onclick="toggleResearcherCard('${r.id}')" style="cursor:pointer;">
         <div class="rc-monogram">${initials(r.name)}</div>
-        <div>
+        <div style="flex:1;">
           <div class="rc-name">${r.name}</div>
           <div class="rc-dept">${r.dept || r.area}</div>
-          ${r.unit ? `<span class="rc-unit">${r.unit}</span>` : ''}
+          ${r.unit ? `<span class="rc-unit" title="${unidadFull}">${r.unit}</span>` : ''}
         </div>
+        <span class="rc-expand" id="rc-exp-${r.id}" style="color:var(--gold);font-size:13px;transition:transform 0.2s;">▾</span>
       </div>
       <div class="rc-body">
         <span class="rc-area">${r.area}</span>
@@ -2125,15 +2188,120 @@ function renderResearchers(filtered = appData.researchers) {
         <div class="rc-meta">
           <span>📄 ${r.pubs||0} pubs</span>
           <span>🎓 SNI ${r.sni}</span>
-          ${r.unit?`<span>🏛️ ${r.unit}</span>`:''}
         </div>
-        <div class="rc-links">
-          ${r.orcid?`<a class="pl-link" href="https://orcid.org/${r.orcid}" target="_blank" onclick="event.stopPropagation()">ORCID</a>`:''}
-          <a class="pl-link" href="https://scholar.google.com/scholar?q=${encodeURIComponent(r.name)}" target="_blank" onclick="event.stopPropagation()">Scholar</a>
-          ${r.email?`<a class="pl-link" href="mailto:${r.email}" onclick="event.stopPropagation()">Email</a>`:''}
+        <div class="rc-expand-panel" id="rc-panel-${r.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          ${unidadFull ? `<div class="rc-detail-row"><span class="rc-detail-ic">🏛️</span><div><div class="rc-detail-lbl">Unidad Académica</div><div class="rc-detail-val">${unidadFull}${r.unit?` <span style="color:var(--text3);">(${r.unit})</span>`:''}</div></div></div>` : ''}
+          ${r.inst ? `<div class="rc-detail-row"><span class="rc-detail-ic">🏢</span><div><div class="rc-detail-lbl">Institución</div><div class="rc-detail-val">${r.inst}</div></div></div>` : ''}
+          ${r.email ? `<div class="rc-detail-row"><span class="rc-detail-ic">✉️</span><div><div class="rc-detail-lbl">Correo institucional</div><div class="rc-detail-val"><a href="mailto:${r.email}" onclick="event.stopPropagation()" style="color:var(--guinda);font-weight:600;">${r.email}</a></div></div></div>` : ''}
+          ${r.ext ? `<div class="rc-detail-row"><span class="rc-detail-ic">☎️</span><div><div class="rc-detail-lbl">Extensión IPN</div><div class="rc-detail-val">${r.ext}</div></div></div>` : ''}
+          ${(r.lines&&r.lines.length) ? `<div class="rc-detail-row"><span class="rc-detail-ic">🔬</span><div><div class="rc-detail-lbl">Líneas de investigación</div><div class="rc-detail-val">${r.lines.join(', ')}</div></div></div>` : ''}
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+            ${r.orcid?`<a class="pl-link" href="https://orcid.org/${r.orcid}" target="_blank" onclick="event.stopPropagation()">ORCID</a>`:''}
+            <a class="pl-link" href="https://scholar.google.com/scholar?q=${encodeURIComponent(r.name)}" target="_blank" onclick="event.stopPropagation()">Scholar</a>
+            <button class="pl-link" onclick="event.stopPropagation();showResearcherDetail('${r.id}')" style="cursor:pointer;background:none;font-family:var(--font-head);">Ver perfil completo →</button>
+          </div>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+}
+
+function renderResearchers(filtered = appData.researchers) {
+  const grid = document.getElementById('researcher-grid');
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">🔍</div><div class="empty-title">Sin resultados</div><div class="empty-desc">No se encontraron investigadores con ese criterio.</div></div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(r => tarjetaInvestigador(r)).join('');
+}
+
+function toggleResearcherCard(id){
+  const panel = document.getElementById('rc-panel-'+id);
+  const exp = document.getElementById('rc-exp-'+id);
+  if(!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if(exp) exp.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+// ── AGRUPACIÓN POR EXPERIENCIA (según artículos publicados) ──
+let _groupByExp = false;
+// Temas de experiencia con palabras clave (en títulos de artículos y revistas)
+const TEMAS_EXPERIENCIA = [
+  ['Farmacología y Productos Naturales', /pharmacol|farmacol|drug|fármac|natural product|phytochem|fitoqu[ií]m|extract|flavon|anthocyan|antioxidant|antioxidante|bioactiv/i],
+  ['Cardiovascular y Metabolismo', /cardiov|cardiac|hypertens|hipertens|metaboli|diabet|obesit|obesidad|lipid|cholesterol|colesterol|glucos|insulin/i],
+  ['Oncología y Cáncer', /cancer|c[aá]ncer|tumor|oncolog|carcino|neoplas|leukemi|leucemia|metasta/i],
+  ['Neurociencia y Salud Mental', /neuro|brain|cerebr|cognit|alzheim|parkinson|depress|ansiedad|anxiety|ment|psiqui|psych/i],
+  ['Inmunología e Infecciones', /immun|inmun|infect|infecc|viral|virus|bacteri|microbi|antimicrob|vaccine|vacuna|antib/i],
+  ['Bioquímica y Biología Molecular', /biochem|bioqu[ií]m|molecular|genom|gen[eé]tic|protein|enzyme|enzima|cellular|celular|signaling|señaliz/i],
+  ['Nutrición y Alimentos', /nutri|food|aliment|diet|obes|vitamin|mineral|micronutri/i],
+  ['Salud Pública y Epidemiología', /public health|salud p[uú]blica|epidemiol|prevalen|incidence|incidencia|cohort|cohorte|population|poblaci[oó]n/i],
+  ['Química Analítica y Metabolómica', /chromatograph|cromatograf|mass spectrom|espectrometr|metabolom|hplc|analytical|anal[ií]tic|nmr/i]
+];
+
+function inferirExperiencia(researcherName){
+  // Reunir todas las publicaciones del investigador
+  const pubs = appData.publications.filter(p =>
+    (Array.isArray(p.network_authors) && p.network_authors.includes(researcherName)) ||
+    (p.authors && p.authors.toLowerCase().includes(researcherName.split(' ').filter(w=>w.length>2)[1]?.toLowerCase()||'@@@'))
+  );
+  if(!pubs.length) return [];
+  // Contar coincidencias de cada tema
+  const texto = pubs.map(p => (p.title||'')+' '+(p.journal||'')).join(' ');
+  const scores = TEMAS_EXPERIENCIA.map(([tema,rx]) => {
+    const matches = (texto.match(new RegExp(rx,'gi'))||[]).length;
+    return { tema, score: matches };
+  }).filter(s=>s.score>0).sort((a,b)=>b.score-a.score);
+  return scores.slice(0,2).map(s=>s.tema); // hasta 2 temas principales
+}
+
+function toggleGroupByExperience(){
+  _groupByExp = !_groupByExp;
+  const btn = document.getElementById('btn-group-exp');
+  if(btn){
+    btn.classList.toggle('active', _groupByExp);
+    btn.textContent = _groupByExp ? '✓ Agrupado por experiencia' : '🔬 Agrupar por experiencia';
+  }
+  if(_groupByExp) renderResearchersGrouped();
+  else renderResearchers();
+}
+
+function renderResearchersGrouped(){
+  const grid = document.getElementById('researcher-grid');
+  // Asignar cada investigador a sus temas de experiencia
+  const grupos = {};
+  const sinClasificar = [];
+  appData.researchers.forEach(r => {
+    const temas = inferirExperiencia(r.name);
+    if(!temas.length){ sinClasificar.push(r); return; }
+    temas.forEach(t => {
+      if(!grupos[t]) grupos[t] = [];
+      grupos[t].push(r);
+    });
+  });
+  const temasOrdenados = Object.keys(grupos).sort((a,b)=>grupos[b].length-grupos[a].length);
+  if(!temasOrdenados.length && !sinClasificar.length){
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-desc">Sin datos suficientes para agrupar.</div></div>';
+    return;
+  }
+  let html = '<div style="grid-column:1/-1;">';
+  temasOrdenados.forEach(tema => {
+    html += `<div style="margin-bottom:24px;">
+      <div style="font-family:var(--font-head);font-size:14px;font-weight:800;color:var(--guinda);padding:8px 0;border-bottom:2px solid var(--gold);margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+        🔬 ${tema} <span style="font-size:11px;color:var(--text3);font-weight:600;">(${grupos[tema].length})</span>
+      </div>
+      <div class="researcher-grid">${grupos[tema].map(r=>tarjetaInvestigador(r)).join('')}</div>
+    </div>`;
+  });
+  if(sinClasificar.length){
+    html += `<div style="margin-bottom:24px;">
+      <div style="font-family:var(--font-head);font-size:14px;font-weight:800;color:var(--text3);padding:8px 0;border-bottom:2px solid var(--border);margin-bottom:14px;">
+        Sin publicaciones suficientes para clasificar <span style="font-size:11px;font-weight:600;">(${sinClasificar.length})</span>
+      </div>
+      <div class="researcher-grid">${sinClasificar.map(r=>tarjetaInvestigador(r)).join('')}</div>
+    </div>`;
+  }
+  html += '</div>';
+  grid.innerHTML = html;
 }
 
 function filterResearchers(q) {
@@ -2159,11 +2327,12 @@ function showResearcherDetail(id) {
 
   document.getElementById('detail-info-content').innerHTML = `
     <div class="info-row"><span class="ir-label">Institución</span><span class="ir-value">${r.inst||'—'}</span></div>
-    <div class="info-row"><span class="ir-label">Unidad académica</span><span class="ir-value">${r.unit||'—'}</span></div>
+    <div class="info-row"><span class="ir-label">Unidad académica</span><span class="ir-value">${r.unit?nombreUnidad(r.unit)+(r.unit!==nombreUnidad(r.unit)?` (${r.unit})`:''):'—'}</span></div>
     <div class="info-row"><span class="ir-label">Área de conocimiento</span><span class="ir-value">${r.areaCompleta||r.area||'—'}</span></div>
     <div class="info-row"><span class="ir-label">Nivel SNI</span><span class="ir-value">${r.sni||'—'}</span></div>
     <div class="info-row"><span class="ir-label">CVU Rizoma</span><span class="ir-value">${r.cvu?`<a href="https://rizoma.conacyt.mx/" target="_blank" style="color:var(--guinda);">#${r.cvu} ↗</a>`:'No registrado'}</span></div>
     <div class="info-row"><span class="ir-label">Email institucional</span><span class="ir-value">${r.email?`<a href="mailto:${r.email}" style="color:var(--guinda);">${r.email}</a>`:'—'}</span></div>
+    <div class="info-row"><span class="ir-label">Extensión IPN</span><span class="ir-value">${r.ext||'—'}</span></div>
     <div style="margin-top:16px;">
       <div style="font-family:var(--font-head);font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Líneas de investigación</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">${(r.lines||[]).map(l=>`<span class="rc-tag">${l}</span>`).join('')||'—'}</div>
@@ -2280,43 +2449,77 @@ function filterPublications(q) { renderPublications(appData.publications.filter(
 function filterPubType(t,btn) { document.querySelectorAll('.fc').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderPublications(t==='all'?appData.publications:appData.publications.filter(p=>p.type===t)); }
 
 function renderNetwork() {
-  const canvas = document.getElementById('netCanvas'), container = document.getElementById('network-container');
-  canvas.width = container.offsetWidth; canvas.height = container.offsetHeight;
-  const ctx = canvas.getContext('2d'), W=canvas.width, H=canvas.height;
-  ctx.fillStyle = '#F7F7F7'; ctx.fillRect(0,0,W,H);
+  const container = document.getElementById('network-container');
   if (!appData.researchers.length) {
-    ctx.fillStyle = '#888'; ctx.font = '14px Arial'; ctx.textAlign = 'center';
-    ctx.fillText('Agrega investigadores para ver el mapa de red', W/2, H/2);
+    container.innerHTML = '<div class="empty-state" style="padding:60px 20px;"><div class="empty-icon">🕸️</div><div class="empty-desc">Agrega investigadores para ver el mapa de red.</div></div>';
     return;
   }
-  const cx=W/2, cy=H/2, N=Math.min(appData.researchers.length,10), R=Math.min(W,H)*0.3;
-  const areaC = {'Salud Pública':'#6A1537','Clínica':'#1E7D35','Básica':'#C8960C','Epidemiología':'#5A3080','Nutrición':'#1A5A7A','Conducta':'#7A3A1A'};
-  const nodes = appData.researchers.slice(0,N).map((r,i) => {
+  const W = container.offsetWidth || 700, H = container.offsetHeight || 420;
+  const cx=W/2, cy=H/2, N=appData.researchers.length, R=Math.min(W,H)*0.32;
+  // Colores por área de investigación
+  const areaC = {'Salud Pública':'#6A1537','Clínica':'#1E7D35','Básica':'#C8960C','Epidemiología':'#5A3080','Nutrición':'#1A5A7A','Conducta':'#7A3A1A','Otra':'#888888'};
+
+  // Nodos de investigadores en círculo
+  const nodes = appData.researchers.map((r,i) => {
     const a = (2*Math.PI*i/N)-Math.PI/2;
-    return { name:r.name.split(' ').slice(0,2).join(' '), x:cx+R*Math.cos(a), y:cy+R*Math.sin(a), color:areaC[r.area]||'#6A1537', r:22 };
+    return {
+      id:r.id, name:r.name, short:r.name.split(' ').slice(0,2).join(' '),
+      x:cx+R*Math.cos(a), y:cy+R*Math.sin(a),
+      color:areaC[r.area]||'#6A1537', r:Math.max(16, Math.min(24, 26-N)),
+      area:r.area, unit:r.unit?nombreUnidad(r.unit):'', pubs:r.pubs||0
+    };
   });
-  nodes.push({ name:'Red\nSalud\nIPN', x:cx, y:cy, color:'#4E0E28', r:34, center:true });
-  const edges = []; for(let i=0;i<N;i++) edges.push({a:i,b:N,w:2});
-  [[0,1],[1,2],[2,3],[0,3],[1,4]].forEach(([a,b])=>{ if(a<N&&b<N) edges.push({a,b,w:1}); });
-  // Grid
-  ctx.strokeStyle = 'rgba(106,21,55,0.05)'; ctx.lineWidth=1;
-  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
-  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-  edges.forEach(e => {
-    const na=nodes[e.a],nb=nodes[e.b];
-    ctx.beginPath();ctx.moveTo(na.x,na.y);ctx.lineTo(nb.x,nb.y);
-    ctx.strokeStyle=e.w>1?'rgba(106,21,55,0.2)':'rgba(106,21,55,0.1)';
-    ctx.lineWidth=e.w>1?2:1; ctx.stroke();
-  });
+
+  // Detectar coautorías entre miembros para dibujar enlaces reales
+  const internal = computeInternalCollaborations();
+  const nameToIdx = {}; nodes.forEach((n,i)=>nameToIdx[n.name]=i);
+
+  // Construir SVG
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:100%;" xmlns="http://www.w3.org/2000/svg">`;
+  // Grid sutil
+  svg += `<defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(106,21,55,0.04)" stroke-width="1"/></pattern></defs>`;
+  svg += `<rect width="${W}" height="${H}" fill="url(#grid)"/>`;
+
+  // Nodo central
+  svg += `<g><line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy}" /></g>`;
+
+  // Enlaces investigador → centro
   nodes.forEach(n => {
-    ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
-    ctx.fillStyle=n.color; ctx.fill();
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();
-    ctx.fillStyle='#fff';
-    ctx.font = `bold ${n.center?10:9}px Montserrat,Arial,sans-serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    n.name.split('\n').forEach((l,i,arr) => ctx.fillText(l,n.x,n.y+(i-(arr.length-1)/2)*12));
+    svg += `<line x1="${cx}" y1="${cy}" x2="${n.x}" y2="${n.y}" stroke="rgba(106,21,55,0.12)" stroke-width="1.5"/>`;
   });
+  // Enlaces de coautoría (más gruesos según número de artículos compartidos)
+  internal.links.forEach(l => {
+    const ia=nameToIdx[l.a], ib=nameToIdx[l.b];
+    if(ia!=null && ib!=null){
+      svg += `<line x1="${nodes[ia].x}" y1="${nodes[ia].y}" x2="${nodes[ib].x}" y2="${nodes[ib].y}" stroke="rgba(200,150,12,0.55)" stroke-width="${Math.min(5,1.5+l.count)}"><title>${l.a.split(' ').slice(0,2).join(' ')} ↔ ${l.b.split(' ').slice(0,2).join(' ')}: ${l.count} artículo(s)</title></line>`;
+    }
+  });
+
+  // Centro
+  svg += `<circle cx="${cx}" cy="${cy}" r="34" fill="#4E0E28" stroke="#fff" stroke-width="3"/>`;
+  svg += `<text x="${cx}" y="${cy-6}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="10">Red</text>`;
+  svg += `<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="10">Salud</text>`;
+  svg += `<text x="${cx}" y="${cy+16}" text-anchor="middle" fill="#C8960C" font-family="Montserrat,Arial" font-weight="800" font-size="9">IPN</text>`;
+
+  // Nodos de investigadores (interactivos con <title> tooltip nativo)
+  nodes.forEach(n => {
+    svg += `<g style="cursor:pointer;" onclick="showResearcherDetail('${n.id}')">
+      <circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${n.color}" stroke="#fff" stroke-width="2.5">
+        <title>${n.name}\n${n.area}${n.unit?' · '+n.unit:''}\n${n.pubs} publicaciones</title>
+      </circle>
+      <text x="${n.x}" y="${n.y+n.r+12}" text-anchor="middle" fill="${n.color}" font-family="Montserrat,Arial" font-weight="700" font-size="9.5">${n.short}</text>
+    </g>`;
+  });
+  svg += `</svg>`;
+  container.innerHTML = svg;
+
+  // Actualizar leyenda dinámica por áreas presentes
+  const leyenda = document.getElementById('network-legend');
+  if(leyenda){
+    const areasPresentes = [...new Set(appData.researchers.map(r=>r.area))];
+    leyenda.innerHTML = areasPresentes.map(a=>`<div class="legend-item"><div class="legend-dot" style="background:${areaC[a]||'#6A1537'};"></div>${a}</div>`).join('')
+      + `<div class="legend-item"><div style="width:18px;height:3px;background:rgba(200,150,12,0.7);"></div>Coautoría entre miembros</div>`;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2411,7 +2614,6 @@ async function detectarColaboracionesExternas(works, onProgress){
   const nacionales = {}; // inst -> count
   const internacionales = {}; // inst -> {count, pais}
   let procesados = 0;
-  // Limitar a los primeros 25 DOIs para no saturar (Crossref + tiempo)
   const conDoi = works.filter(w=>w.doi).slice(0,25);
   for(const w of conDoi){
     const affs = await fetchCrossrefAffiliations(w.doi);
@@ -2419,14 +2621,26 @@ async function detectarColaboracionesExternas(works, onProgress){
       if(a.pais === 'MX'){
         nacionales[a.inst] = (nacionales[a.inst]||0) + 1;
       } else if(a.pais){
+        // País internacional identificado
         if(!internacionales[a.inst]) internacionales[a.inst] = {count:0, pais:a.pais};
         internacionales[a.inst].count++;
+      } else {
+        // País indeterminado: si NO parece mexicana, clasificar como internacional
+        // (heurística: nombres en inglés o sin referencias mexicanas)
+        const t = (a.raw||a.inst).toLowerCase();
+        const pareceMexicana = /m[eé]xico|mexican|unam|cinvestav|uam|ipn|conacyt|conahcyt|imss|issste|guadalajara|monterrey|puebla|veracruz|yucat[aá]n|oaxaca/.test(t);
+        if(!pareceMexicana){
+          if(!internacionales[a.inst]) internacionales[a.inst] = {count:0, pais:'No especificado'};
+          internacionales[a.inst].count++;
+        } else {
+          // Probablemente mexicana sin decir "México" explícito
+          nacionales[a.inst] = (nacionales[a.inst]||0) + 1;
+        }
       }
-      // Si país indeterminado, lo omitimos (queda para revisión manual)
     });
     procesados++;
     if(onProgress) onProgress(procesados, conDoi.length);
-    await new Promise(r=>setTimeout(r, 120)); // cortesía con la API
+    await new Promise(r=>setTimeout(r, 120));
   }
   return { nacionales, internacionales };
 }
@@ -2733,12 +2947,13 @@ async function addResearcher(){
     area:document.getElementById('r-area').value, sni:document.getElementById('r-sni').value,
     orcid:document.getElementById('r-orcid').value, cvu:document.getElementById('r-cvu').value,
     email:document.getElementById('r-email').value, bio:document.getElementById('r-bio').value,
+    ext:document.getElementById('r-ext').value,
     lines:document.getElementById('r-lines').value.split(',').map(s=>s.trim()).filter(Boolean),
     pubs:0, rizoma:'https://rizoma.conacyt.mx/'
   });
   if(ok){
     closeModal('modal-researcher');
-    ['r-name','r-dept','r-unit','r-inst','r-orcid','r-cvu','r-email','r-lines','r-bio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['r-name','r-dept','r-unit','r-inst','r-orcid','r-cvu','r-email','r-ext','r-lines','r-bio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   }
 }
 
@@ -2798,6 +3013,7 @@ async function saveCVUResearcher(){
     sni:document.getElementById('cvu-sni').value,
     orcid,
     email:document.getElementById('cvu-email').value,
+    ext:document.getElementById('cvu-ext').value,
     lines:document.getElementById('cvu-lines').value.split(',').map(s=>s.trim()).filter(Boolean),
     bio:document.getElementById('cvu-bio').value,
     pubs:0, rizoma:'https://rizoma.conacyt.mx/'
