@@ -436,6 +436,30 @@ body {
 }
 .pl-link:hover { background: var(--guinda); color: #fff; }
 
+/* Calendario */
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-dow { text-align: center; font-family: var(--font-head); font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; padding: 4px 0; letter-spacing: 0.5px; }
+.cal-cell { min-height: 52px; border: 1px solid var(--border); border-radius: 6px; padding: 4px; position: relative; background: var(--white); transition: background 0.12s; }
+.cal-cell.other-month { background: var(--bg); opacity: 0.5; }
+.cal-cell.today { border-color: var(--guinda); border-width: 2px; background: var(--guinda-soft); }
+.cal-daynum { font-size: 11px; font-weight: 600; color: var(--text2); }
+.cal-cell.today .cal-daynum { color: var(--guinda); font-weight: 800; }
+.cal-ev { font-size: 8.5px; background: var(--guinda); color: #fff; border-radius: 3px; padding: 1px 4px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.cal-ev.ongoing { background: var(--gold); }
+.cal-ev.type-Convocatoria { background: #1E7D35; }
+.cal-ev.type-Congreso { background: var(--guinda); }
+.cal-ev.type-Seminario, .cal-ev.type-Taller { background: #5A3080; }
+.ev-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.ev-item:hover { background: var(--guinda-soft); }
+.ev-date-badge { flex-shrink: 0; width: 44px; text-align: center; background: var(--guinda); color: #fff; border-radius: 6px; padding: 4px 0; }
+.ev-date-badge.ongoing { background: var(--gold); }
+.ev-date-day { font-family: var(--font-head); font-size: 16px; font-weight: 800; line-height: 1; }
+.ev-date-mon { font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+.ev-status { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 7px; border-radius: 3px; }
+.ev-status.ongoing { background: var(--gold-pale); color: #8B6914; }
+.ev-status.upcoming { background: var(--guinda-soft); color: var(--guinda); }
+
+
 /* Panel expandible de investigador */
 .rc-detail-row {
   display: flex; gap: 10px; align-items: flex-start;
@@ -963,6 +987,9 @@ body {
     <button class="nav-item" onclick="showSection('collaborations')">
       <span class="nav-icon">🌐</span> Colaboraciones
     </button>
+    <button class="nav-item" onclick="showSection('calendar')">
+      <span class="nav-icon">📅</span> Calendario
+    </button>
   </div>
 
   <div class="nav-divider"></div>
@@ -973,7 +1000,7 @@ body {
       <span class="nav-icon">⚙️</span> Gestión de datos
     </button>
     <button class="nav-item" onclick="showSection('cvu')">
-      <span class="nav-icon">📋</span> Cargar CVU
+      <span class="nav-icon">📋</span> Cargar ficha
     </button>
     <button class="nav-item" onclick="showSection('supabase-setup')">
       <span class="nav-icon">🔗</span> Configuración BD
@@ -1002,9 +1029,9 @@ body {
         <span class="topbar-page" id="topbar-title">Panel principal</span>
       </div>
       <div class="topbar-right">
-        <button class="btn btn-outline btn-sm admin-only" onclick="syncToSupabase()">↺ Sincronizar</button>
+        <button class="btn btn-outline btn-sm admin-only" onclick="sincronizarTodosORCID()" title="Revisar ORCID de todos los investigadores e importar artículos nuevos">🔄 Sincronizar ORCID</button>
         <button class="btn btn-outline btn-sm admin-only" onclick="openModal('modal-researcher')">+ Investigador</button>
-        <button class="btn btn-guinda btn-sm admin-only" onclick="showSection('cvu')">↑ Cargar CVU</button>
+        <button class="btn btn-guinda btn-sm admin-only" onclick="showSection('cvu')">↑ Cargar ficha</button>
         <div id="admin-indicator">
           🔑 Administrador &nbsp;
           <button onclick="doLogout()" style="background:none;border:none;cursor:pointer;color:var(--gold);font-size:11px;text-decoration:underline;font-family:var(--font-body);">Salir</button>
@@ -1133,18 +1160,18 @@ body {
         <div class="sh-title">Investigadores</div>
       </div>
       <div class="sh-actions admin-only">
-        <button class="btn btn-outline btn-sm" onclick="showSection('cvu')">📋 Cargar CVU</button>
+        <button class="btn btn-outline btn-sm" onclick="showSection('cvu')">📋 Cargar ficha</button>
         <button class="btn btn-guinda btn-sm" onclick="openModal('modal-researcher')">+ Nuevo</button>
       </div>
     </div>
     <div class="filter-row">
       <input type="text" class="search-bar" placeholder="Buscar investigador, área, unidad…" oninput="filterResearchers(this.value)">
-      <button class="fc active" onclick="filterByArea('all',this)">Todos</button>
-      <button class="fc" onclick="filterByArea('Salud Pública',this)">Salud Pública</button>
-      <button class="fc" onclick="filterByArea('Clínica',this)">Clínica</button>
-      <button class="fc" onclick="filterByArea('Básica',this)">Básica</button>
-      <button class="fc" onclick="filterByArea('Epidemiología',this)">Epidemiología</button>
-      <button class="fc" onclick="filterByArea('Nutrición',this)">Nutrición</button>
+      <button class="fc active" onclick="filterByArea('all',this)">Todas</button>
+      <button class="fc" onclick="filterByArea('Enfermedades crónico-degenerativas',this)">Crónico-degenerativas</button>
+      <button class="fc" onclick="filterByArea('Enfermedades infecto-contagiosas',this)">Infecto-contagiosas</button>
+      <button class="fc" onclick="filterByArea('Enfermedades perinatales y del embarazo',this)">Perinatales</button>
+      <button class="fc" onclick="filterByArea('Alimentación y nutrición',this)">Alimentación y nutrición</button>
+      <button class="fc" onclick="filterByArea('Conducta',this)">Conducta</button>
       <button class="fc" id="btn-group-exp" onclick="toggleGroupByExperience()" style="margin-left:auto;border-color:var(--gold);color:var(--gold);">🔬 Agrupar por experiencia</button>
     </div>
     <div class="researcher-grid" id="researcher-grid">
@@ -1234,6 +1261,31 @@ body {
     </div>
   </section>
 
+  <!-- CALENDARIO DE EVENTOS -->
+  <section class="section" id="section-calendar">
+    <div class="section-header">
+      <div class="sh-left"><div class="sh-eyebrow">Agenda de la Red</div><div class="sh-title">Calendario de Eventos</div></div>
+      <button class="btn btn-guinda btn-sm admin-only" onclick="openEventModal()">+ Nuevo evento</button>
+    </div>
+    <div class="grid-2" style="align-items:start;">
+      <div class="card">
+        <div class="card-header">
+          <h3 id="cal-month-title">Calendario</h3>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-outline btn-sm" onclick="calPrevMonth()">‹</button>
+            <button class="btn btn-outline btn-sm" onclick="calToday()">Hoy</button>
+            <button class="btn btn-outline btn-sm" onclick="calNextMonth()">›</button>
+          </div>
+        </div>
+        <div class="card-body"><div id="calendar-grid"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Próximos y en curso</h3></div>
+        <div class="card-body"><div id="events-list"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Sin eventos programados.</div></div></div></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ADMINISTRACIÓN -->
   <section class="section" id="section-admin">
     <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Panel de control</div><div class="sh-title">Gestión de datos</div></div></div>
@@ -1252,6 +1304,15 @@ body {
       </div>
     </div>
     <div class="card mt-20">
+      <div class="card-header"><h3>Importar directorio preliminar</h3></div>
+      <div class="card-body">
+        <div style="background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--text2);">
+          Carga masiva del directorio recopilado por los colaboradores (archivo <code>directorio_import.json</code>). Solo se agregan los investigadores que aún no existen; los repetidos se omiten. Después puedes usar <strong>Sincronizar ORCID</strong> para traer sus publicaciones.
+        </div>
+        <button class="btn btn-guinda" onclick="importarDirectorio()">📥 Importar directorio de investigadores</button>
+      </div>
+    </div>
+    <div class="card mt-20">
       <div class="card-header"><h3>Exportar datos</h3></div>
       <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-outline" onclick="exportJSON()">⬇ JSON completo</button>
@@ -1264,38 +1325,34 @@ body {
 
   <!-- CARGAR CVU -->
   <section class="section" id="section-cvu">
-    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Incorporar investigador</div><div class="sh-title">Cargar CVU de Rizoma</div></div></div>
+    <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Incorporar investigador</div><div class="sh-title">Cargar ficha de registro</div></div></div>
     <div class="grid-2">
       <div class="card">
-        <div class="card-header"><h3>Subir PDF — Perfil Único Secihti</h3></div>
+        <div class="card-header"><h3>Subir PDF — Ficha de Registro Red de Salud</h3></div>
         <div class="card-body">
+          <div style="background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text2);">
+            Sube el <strong>PDF de la ficha de registro</strong> que cada investigador llenó. La plataforma lee los campos del formulario automáticamente. <a href="Plantilla_Investigador_RedSalud.pdf" download style="color:var(--guinda);font-weight:600;">↓ Descargar plantilla en blanco</a>
+          </div>
           <div class="dropzone" onclick="document.getElementById('cvu-file-input').click()" ondragover="event.preventDefault();this.style.borderColor='var(--guinda)'" ondragleave="this.style.borderColor=''" ondrop="handleCVUDrop(event)">
             <div class="dropzone-icon">📄</div>
-            <div class="dropzone-title">Arrastra el PDF del CVU aquí</div>
-            <div class="dropzone-sub">o clic para seleccionar · Perfil Único Rizoma / Secihti</div>
+            <div class="dropzone-title">Arrastra el PDF de la ficha aquí</div>
+            <div class="dropzone-sub">o clic para seleccionar · Ficha de Registro Red de Salud IPN</div>
           </div>
           <input type="file" id="cvu-file-input" accept=".pdf" style="display:none" onchange="handleCVUFile(this)">
           <div id="cvu-file-display" style="margin-top:10px;"></div>
           <div id="cvu-result-area"></div>
-          <div style="margin-top:14px;">
-            <label style="font-size:11px;font-family:var(--font-head);font-weight:700;color:var(--guinda);text-transform:uppercase;letter-spacing:0.5px;">URL Rizoma (opcional)</label>
-            <div style="display:flex;gap:8px;margin-top:6px;">
-              <input type="url" id="cvu-url" placeholder="https://rizoma.conacyt.mx/cvu/…" style="flex:1;padding:8px 11px;border:1px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font-body);background:var(--white);color:var(--text);outline:none;">
-              <button class="btn btn-guinda" onclick="processCVUURL()">Cargar</button>
-            </div>
-          </div>
         </div>
       </div>
       <div class="card">
         <div class="card-header"><h3>Datos extraídos / Captura manual</h3></div>
         <div class="card-body">
-          <div class="form-row"><div class="fg"><label>Nombre completo *</label><input type="text" id="cvu-name" placeholder="Dr. Nombre Apellidos"></div><div class="fg"><label>No. CVU</label><input type="text" id="cvu-number" placeholder="559655"></div></div>
-          <div class="form-row"><div class="fg"><label>Institución</label><input type="text" id="cvu-institution" placeholder="ESM, ENCB, CIIDIR…"></div><div class="fg"><label>Unidad académica</label><input type="text" id="cvu-unit" placeholder="ESM, ENCB, CBG…"></div></div>
-          <div class="form-row"><div class="fg"><label>ORCID</label><input type="text" id="cvu-orcid" placeholder="0000-0000-0000-0000"></div><div class="fg"><label>Nivel SNI</label><select id="cvu-sni"><option>Candidato</option><option>Nivel I</option><option>Nivel II</option><option>Nivel III</option><option>Emérito</option><option>No aplica</option></select></div></div>
-          <div class="form-row"><div class="fg"><label>Área de investigación</label><select id="cvu-area"><option>Salud Pública</option><option>Clínica</option><option>Básica</option><option>Epidemiología</option><option>Nutrición</option><option>Conducta</option><option>Otra</option></select></div><div class="fg"><label>Email institucional</label><input type="email" id="cvu-email" placeholder="investigador@ipn.mx"></div></div>
-          <div class="form-row"><div class="fg"><label>Extensión IPN</label><input type="text" id="cvu-ext" placeholder="Ej: 62743"></div><div class="fg"></div></div>
-          <div class="form-row full"><div class="fg"><label>Líneas de investigación (coma)</label><input type="text" id="cvu-lines" placeholder="Farmacología, Metabolismo, Oncología…"></div></div>
-          <div class="form-row full"><div class="fg"><label>Semblanza académica</label><textarea id="cvu-bio" placeholder="Trayectoria, grados, producción…"></textarea></div></div>
+          <div class="form-row"><div class="fg"><label>Nombre completo *</label><input type="text" id="cvu-name" placeholder="Nombre Apellido1 Apellido2"></div><div class="fg"><label>Sexo</label><input type="text" id="cvu-sexo" placeholder="Mujer / Hombre"></div></div>
+          <div class="form-row"><div class="fg"><label>Unidad académica</label><input type="text" id="cvu-unit" placeholder="ESM, ENCB, CBG…"></div><div class="fg"><label>Departamento</label><input type="text" id="cvu-dept" placeholder="Departamento"></div></div>
+          <div class="form-row"><div class="fg"><label>Laboratorio</label><input type="text" id="cvu-lab" placeholder="Nombre del laboratorio"></div><div class="fg"><label>Extensión IPN</label><input type="text" id="cvu-ext" placeholder="Ej: 62743"></div></div>
+          <div class="form-row"><div class="fg"><label>Email institucional</label><input type="email" id="cvu-email" placeholder="investigador@ipn.mx"></div><div class="fg"><label>Nivel SNII</label><select id="cvu-sni"><option>Candidato</option><option>Nivel I</option><option>Nivel II</option><option>Nivel III</option><option>Emérito</option><option>No aplica</option></select></div></div>
+          <div class="form-row"><div class="fg"><label>Área de la Red de Salud</label><select id="cvu-area-red"><option value="">— Seleccionar —</option><option>Enfermedades crónico-degenerativas</option><option>Enfermedades infecto-contagiosas</option><option>Enfermedades perinatales y del embarazo</option><option>Alimentación y nutrición</option><option>Conducta</option></select></div><div class="fg"><label>ORCID (liga o ID)</label><input type="text" id="cvu-orcid" placeholder="https://orcid.org/0000-…"></div></div>
+          <div class="form-row"><div class="fg"><label>Liga Scopus</label><input type="url" id="cvu-scopus" placeholder="https://scopus.com/…"></div><div class="fg"><label>Liga Google Scholar</label><input type="url" id="cvu-scholar" placeholder="https://scholar.google.com/…"></div></div>
+          <div class="form-row full"><div class="fg"><label>Líneas de investigación (coma)</label><input type="text" id="cvu-lines" placeholder="Línea 1, Línea 2"></div></div>
           <button class="btn btn-guinda" style="width:100%" onclick="saveCVUResearcher()">✓ Guardar investigador en la Red</button>
         </div>
       </div>
@@ -1434,6 +1491,72 @@ body {
   </div>
 </div>
 
+<!-- Editar datos complementarios del investigador -->
+<div class="modal-overlay" id="modal-researcher-edit">
+  <div class="modal">
+    <div class="modal-head"><button class="modal-close" onclick="closeModal('modal-researcher-edit')">✕</button><h2>Editar investigador</h2><p id="edit-researcher-subtitle">Datos complementarios y correcciones</p></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-r-id">
+      <div style="background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);padding:10px 12px;margin-bottom:16px;font-size:12px;color:var(--text2);">
+        Aquí puedes completar datos que el CVU de Rizoma no incluye, o corregir los extraídos automáticamente.
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Nombre completo</label><input type="text" id="edit-r-name"></div>
+        <div class="fg"><label>Unidad académica (sigla)</label><input type="text" id="edit-r-unit" placeholder="ESM, ENCB, CBG…"></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Nombre del laboratorio</label><input type="text" id="edit-r-lab" placeholder="Ej: Lab. de Investigación Integral Cardiometabólica"></div>
+        <div class="fg"><label>Extensión del laboratorio</label><input type="text" id="edit-r-extlab" placeholder="Ej: 62750"></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Extensión personal IPN</label><input type="text" id="edit-r-ext" placeholder="Ej: 62743"></div>
+        <div class="fg"><label>Correo institucional</label><input type="email" id="edit-r-email" placeholder="investigador@ipn.mx"></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Área de investigación</label><select id="edit-r-area"><option>Salud Pública</option><option>Clínica</option><option>Básica</option><option>Epidemiología</option><option>Nutrición</option><option>Conducta</option><option>Otra</option></select></div>
+        <div class="fg"><label>Nivel SNI</label><select id="edit-r-sni"><option>Candidato</option><option>Nivel I</option><option>Nivel II</option><option>Nivel III</option><option>Emérito</option><option>No aplica</option></select></div>
+      </div>
+      <div class="form-row full"><div class="fg"><label>Líneas de investigación (separadas por coma)</label><input type="text" id="edit-r-lines" placeholder="Farmacología, Metabolismo…"></div></div>
+      <div class="form-row full"><div class="fg"><label>Semblanza</label><textarea id="edit-r-bio"></textarea></div></div>
+      <div style="display:flex;justify-content:space-between;gap:9px;margin-top:8px;align-items:center;">
+        <button class="btn btn-danger btn-sm" onclick="deleteResearcherFromEdit()">🗑 Eliminar investigador</button>
+        <div style="display:flex;gap:9px;">
+          <button class="btn btn-outline" onclick="closeModal('modal-researcher-edit')">Cancelar</button>
+          <button class="btn btn-guinda" onclick="saveResearcherEdit()">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de evento -->
+<div class="modal-overlay" id="modal-event">
+  <div class="modal">
+    <div class="modal-head"><button class="modal-close" onclick="closeModal('modal-event')">✕</button><h2 id="event-modal-title">Nuevo evento</h2><p>Eventos próximos y en curso de la Red</p></div>
+    <div class="modal-body">
+      <input type="hidden" id="event-id">
+      <div class="form-row full"><div class="fg"><label>Título del evento *</label><input type="text" id="event-title" placeholder="Ej: Congreso Nacional de Salud IPN 2026"></div></div>
+      <div class="form-row">
+        <div class="fg"><label>Tipo</label><select id="event-type"><option>Congreso</option><option>Seminario</option><option>Taller</option><option>Convocatoria</option><option>Reunión</option><option>Curso</option><option>Conferencia</option><option>Evento</option></select></div>
+        <div class="fg"><label>Lugar / Modalidad</label><input type="text" id="event-location" placeholder="Auditorio ESM / En línea"></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Fecha de inicio *</label><input type="date" id="event-start"></div>
+        <div class="fg"><label>Fecha de fin (opcional)</label><input type="date" id="event-end"></div>
+      </div>
+      <div class="form-row full"><div class="fg"><label>Enlace (opcional)</label><input type="url" id="event-url" placeholder="https://…"></div></div>
+      <div class="form-row full"><div class="fg"><label>Descripción</label><textarea id="event-desc" placeholder="Detalles del evento…"></textarea></div></div>
+      <div style="display:flex;justify-content:space-between;gap:9px;margin-top:8px;align-items:center;">
+        <button class="btn btn-danger btn-sm" id="event-delete-btn" onclick="deleteEvent()" style="display:none;">🗑 Eliminar</button>
+        <div style="display:flex;gap:9px;margin-left:auto;">
+          <button class="btn btn-outline" onclick="closeModal('modal-event')">Cancelar</button>
+          <button class="btn btn-guinda" onclick="saveEvent()">Guardar evento</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Login -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-box">
@@ -1467,7 +1590,8 @@ let appData = {
   researchers: [],
   projects: [],
   publications: [],
-  collaborations: { national: [], international: [] }
+  collaborations: { national: [], international: [] },
+  events: []
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1513,7 +1637,7 @@ const sectionTitles = {
   dashboard: 'Panel principal', researchers: 'Investigadores',
   projects: 'Proyectos e iniciativas', publications: 'Publicaciones',
   network: 'Mapa de red', collaborations: 'Colaboraciones',
-  admin: 'Gestión de datos', cvu: 'Cargar CVU', 'supabase-setup': 'Configuración BD'
+  admin: 'Gestión de datos', cvu: 'Cargar ficha', 'supabase-setup': 'Configuración BD'
 };
 
 function showSection(id) {
@@ -1536,6 +1660,7 @@ function showSection(id) {
   if (id === 'publications') renderPublications();
   if (id === 'network') setTimeout(renderNetwork, 120);
   if (id === 'collaborations') renderCollaborations();
+  if (id === 'calendar') renderCalendar();
   if (id === 'admin') renderAdmin();
 }
 
@@ -1641,7 +1766,8 @@ async function loadAllData() {
       loadResearchers(),
       loadProjects(),
       loadPublications(),
-      loadCollaborations()
+      loadCollaborations(),
+      loadEvents()
     ]);
     setSyncStatus('connected', 'Sincronizado');
   } catch(e) {
@@ -1658,6 +1784,11 @@ async function loadResearchers() {
     lines: Array.isArray(r.lines) ? r.lines : [],
     pubs: r.pubs || 0,
     ext: r.ext || '',
+    laboratorio: r.laboratorio || '',
+    ext_laboratorio: r.ext_laboratorio || '',
+    sexo: r.sexo || '',
+    scopus: r.scopus || '',
+    scholar: r.scholar || '',
     areaCompleta: r.area_completa || ''
   }));
 }
@@ -1714,6 +1845,10 @@ function subscribeRealtime() {
       await loadCollaborations();
       refreshActiveView();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, async () => {
+      await loadEvents();
+      refreshActiveView();
+    })
     .subscribe(status => {
       if (status === 'SUBSCRIBED') setSyncStatus('connected', 'Tiempo real activo');
       if (status === 'CLOSED') setSyncStatus('warning', 'Conexión cerrada');
@@ -1730,6 +1865,7 @@ function refreshActiveView() {
   if (id==='publications') renderPublications();
   if (id==='network') renderNetwork();
   if (id==='collaborations') renderCollaborations();
+  if (id==='calendar') renderCalendar();
 }
 
 // ── CRUD — Investigadores ───────────────────────────────────
@@ -1741,6 +1877,8 @@ async function saveResearcher(data) {
     disciplina: data.disciplina||'', subdisciplina: data.subdisciplina||'',
     sni: data.sni, orcid: data.orcid||'', cvu: data.cvu||'',
     email: data.email||'', bio: data.bio||'', ext: data.ext||'',
+    laboratorio: data.laboratorio||'', ext_laboratorio: data.extLaboratorio||'',
+    sexo: data.sexo||'', scopus: data.scopus||'', scholar: data.scholar||'',
     lines: Array.isArray(data.lines) ? data.lines : [],
     pubs: parseInt(data.pubs)||0,
     rizoma: data.rizoma||'https://rizoma.conacyt.mx/'
@@ -1748,6 +1886,11 @@ async function saveResearcher(data) {
   // Actualizar si ya existe por nombre, insertar si es nuevo
   const existing = appData.researchers.find(r => r.name.toLowerCase() === data.name.toLowerCase());
   if (existing && existing.id) {
+    // Preservar datos complementarios que no vienen en el CVU (laboratorio, extensiones)
+    // para que una recarga de CVU no los borre
+    if(!data.laboratorio && existing.laboratorio) record.laboratorio = existing.laboratorio;
+    if(!data.extLaboratorio && existing.ext_laboratorio) record.ext_laboratorio = existing.ext_laboratorio;
+    if(!data.ext && existing.ext) record.ext = existing.ext;
     const { error } = await db.from('researchers').update(record).eq('id', existing.id);
     if (error) { notify('✕ Error al actualizar: ' + error.message); return null; }
     notify('✓ Perfil actualizado: ' + data.name);
@@ -1765,6 +1908,66 @@ async function deleteResearcherDB(id) {
   const { error } = await db.from('researchers').delete().eq('id', id);
   if (error) notify('✕ Error: ' + error.message);
   else { notify('Investigador eliminado'); appData.researchers = appData.researchers.filter(r=>r.id!==id); renderAdmin(); }
+}
+
+// ── EDICIÓN de datos complementarios ────────────────────────
+function openResearcherEdit(id){
+  if(!isAdmin){ openLogin(); return; }
+  const r = appData.researchers.find(x => String(x.id) === String(id));
+  if(!r) return;
+  document.getElementById('edit-r-id').value = r.id;
+  document.getElementById('edit-researcher-subtitle').textContent = r.name;
+  document.getElementById('edit-r-name').value = r.name || '';
+  document.getElementById('edit-r-unit').value = r.unit || '';
+  document.getElementById('edit-r-lab').value = r.laboratorio || '';
+  document.getElementById('edit-r-extlab').value = r.ext_laboratorio || '';
+  document.getElementById('edit-r-ext').value = r.ext || '';
+  document.getElementById('edit-r-email').value = r.email || '';
+  document.getElementById('edit-r-area').value = r.area || 'Clínica';
+  document.getElementById('edit-r-sni').value = r.sni || 'No aplica';
+  document.getElementById('edit-r-lines').value = (r.lines||[]).join(', ');
+  document.getElementById('edit-r-bio').value = r.bio || '';
+  // cerrar el detalle si estaba abierto
+  closeModal('modal-researcher-detail');
+  document.getElementById('modal-researcher-edit').classList.add('open');
+}
+
+async function saveResearcherEdit(){
+  if(!isAdmin || !db){ openLogin(); return; }
+  const id = document.getElementById('edit-r-id').value;
+  const r = appData.researchers.find(x => String(x.id) === String(id));
+  if(!r){ notify('Investigador no encontrado'); return; }
+  const record = {
+    name: document.getElementById('edit-r-name').value.trim() || r.name,
+    unit: document.getElementById('edit-r-unit').value.trim(),
+    laboratorio: document.getElementById('edit-r-lab').value.trim(),
+    ext_laboratorio: document.getElementById('edit-r-extlab').value.trim(),
+    ext: document.getElementById('edit-r-ext').value.trim(),
+    email: document.getElementById('edit-r-email').value.trim(),
+    area: document.getElementById('edit-r-area').value,
+    dept: document.getElementById('edit-r-area').value,
+    sni: document.getElementById('edit-r-sni').value,
+    lines: document.getElementById('edit-r-lines').value.split(',').map(s=>s.trim()).filter(Boolean),
+    bio: document.getElementById('edit-r-bio').value.trim()
+  };
+  const { error } = await db.from('researchers').update(record).eq('id', id);
+  if(error){ notify('✕ Error: ' + error.message); return; }
+  notify('✓ Cambios guardados: ' + record.name);
+  closeModal('modal-researcher-edit');
+  await loadResearchers();
+  refreshActiveView();
+}
+
+async function deleteResearcherFromEdit(){
+  const id = document.getElementById('edit-r-id').value;
+  if(!id) return;
+  if(!confirm('¿Eliminar este investigador permanentemente? Esta acción no se puede deshacer.')) return;
+  const { error } = await db.from('researchers').delete().eq('id', id);
+  if(error){ notify('✕ Error: ' + error.message); return; }
+  notify('Investigador eliminado');
+  closeModal('modal-researcher-edit');
+  await loadResearchers();
+  refreshActiveView();
 }
 
 // ── CRUD — Proyectos ────────────────────────────────────────
@@ -2192,13 +2395,16 @@ function tarjetaInvestigador(r){
         <div class="rc-expand-panel" id="rc-panel-${r.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
           ${unidadFull ? `<div class="rc-detail-row"><span class="rc-detail-ic">🏛️</span><div><div class="rc-detail-lbl">Unidad Académica</div><div class="rc-detail-val">${unidadFull}${r.unit?` <span style="color:var(--text3);">(${r.unit})</span>`:''}</div></div></div>` : ''}
           ${r.inst ? `<div class="rc-detail-row"><span class="rc-detail-ic">🏢</span><div><div class="rc-detail-lbl">Institución</div><div class="rc-detail-val">${r.inst}</div></div></div>` : ''}
+          ${r.laboratorio ? `<div class="rc-detail-row"><span class="rc-detail-ic">🔬</span><div><div class="rc-detail-lbl">Laboratorio</div><div class="rc-detail-val">${r.laboratorio}</div></div></div>` : ''}
           ${r.email ? `<div class="rc-detail-row"><span class="rc-detail-ic">✉️</span><div><div class="rc-detail-lbl">Correo institucional</div><div class="rc-detail-val"><a href="mailto:${r.email}" onclick="event.stopPropagation()" style="color:var(--guinda);font-weight:600;">${r.email}</a></div></div></div>` : ''}
-          ${r.ext ? `<div class="rc-detail-row"><span class="rc-detail-ic">☎️</span><div><div class="rc-detail-lbl">Extensión IPN</div><div class="rc-detail-val">${r.ext}</div></div></div>` : ''}
-          ${(r.lines&&r.lines.length) ? `<div class="rc-detail-row"><span class="rc-detail-ic">🔬</span><div><div class="rc-detail-lbl">Líneas de investigación</div><div class="rc-detail-val">${r.lines.join(', ')}</div></div></div>` : ''}
+          ${r.ext ? `<div class="rc-detail-row"><span class="rc-detail-ic">☎️</span><div><div class="rc-detail-lbl">Extensión personal</div><div class="rc-detail-val">${r.ext}</div></div></div>` : ''}
+          ${r.ext_laboratorio ? `<div class="rc-detail-row"><span class="rc-detail-ic">📞</span><div><div class="rc-detail-lbl">Extensión del laboratorio</div><div class="rc-detail-val">${r.ext_laboratorio}</div></div></div>` : ''}
+          ${(r.lines&&r.lines.length) ? `<div class="rc-detail-row"><span class="rc-detail-ic">📚</span><div><div class="rc-detail-lbl">Líneas de investigación</div><div class="rc-detail-val">${r.lines.join(', ')}</div></div></div>` : ''}
           <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
             ${r.orcid?`<a class="pl-link" href="https://orcid.org/${r.orcid}" target="_blank" onclick="event.stopPropagation()">ORCID</a>`:''}
             <a class="pl-link" href="https://scholar.google.com/scholar?q=${encodeURIComponent(r.name)}" target="_blank" onclick="event.stopPropagation()">Scholar</a>
-            <button class="pl-link" onclick="event.stopPropagation();showResearcherDetail('${r.id}')" style="cursor:pointer;background:none;font-family:var(--font-head);">Ver perfil completo →</button>
+            <button class="pl-link" onclick="event.stopPropagation();showResearcherDetail('${r.id}')" style="cursor:pointer;background:none;font-family:var(--font-head);">Ver perfil →</button>
+            <button class="pl-link admin-only" onclick="event.stopPropagation();openResearcherEdit('${r.id}')" style="cursor:pointer;background:var(--gold-pale);border-color:var(--gold);color:var(--gold);font-family:var(--font-head);">✏️ Editar</button>
           </div>
         </div>
       </div>
@@ -2332,7 +2538,9 @@ function showResearcherDetail(id) {
     <div class="info-row"><span class="ir-label">Nivel SNI</span><span class="ir-value">${r.sni||'—'}</span></div>
     <div class="info-row"><span class="ir-label">CVU Rizoma</span><span class="ir-value">${r.cvu?`<a href="https://rizoma.conacyt.mx/" target="_blank" style="color:var(--guinda);">#${r.cvu} ↗</a>`:'No registrado'}</span></div>
     <div class="info-row"><span class="ir-label">Email institucional</span><span class="ir-value">${r.email?`<a href="mailto:${r.email}" style="color:var(--guinda);">${r.email}</a>`:'—'}</span></div>
-    <div class="info-row"><span class="ir-label">Extensión IPN</span><span class="ir-value">${r.ext||'—'}</span></div>
+    <div class="info-row"><span class="ir-label">Extensión personal</span><span class="ir-value">${r.ext||'—'}</span></div>
+    ${r.laboratorio?`<div class="info-row"><span class="ir-label">Laboratorio</span><span class="ir-value">${r.laboratorio}</span></div>`:''}
+    ${r.ext_laboratorio?`<div class="info-row"><span class="ir-label">Extensión del laboratorio</span><span class="ir-value">${r.ext_laboratorio}</span></div>`:''}
     <div style="margin-top:16px;">
       <div style="font-family:var(--font-head);font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Líneas de investigación</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">${(r.lines||[]).map(l=>`<span class="rc-tag">${l}</span>`).join('')||'—'}</div>
@@ -2457,7 +2665,14 @@ function renderNetwork() {
   const W = container.offsetWidth || 700, H = container.offsetHeight || 420;
   const cx=W/2, cy=H/2, N=appData.researchers.length, R=Math.min(W,H)*0.32;
   // Colores por área de investigación
-  const areaC = {'Salud Pública':'#6A1537','Clínica':'#1E7D35','Básica':'#C8960C','Epidemiología':'#5A3080','Nutrición':'#1A5A7A','Conducta':'#7A3A1A','Otra':'#888888'};
+  const areaC = {
+    'Enfermedades crónico-degenerativas':'#6A1537',
+    'Enfermedades infecto-contagiosas':'#1E7D35',
+    'Enfermedades perinatales y del embarazo':'#5A3080',
+    'Alimentación y nutrición':'#C8960C',
+    'Conducta':'#1A5A7A',
+    'Otra':'#888888', '':'#888888'
+  };
 
   // Nodos de investigadores en círculo
   const nodes = appData.researchers.map((r,i) => {
@@ -2710,19 +2925,36 @@ function renderCollaborations() {
   if (!hasInternal && !hasExternal) {
     svg.innerHTML = `<rect width="900" height="450" fill="#F7F7F7"/><text x="450" y="225" text-anchor="middle" font-size="14" fill="#888" font-family="Arial">Sin colaboraciones registradas aún</text>`;
   } else {
+    const nat = appData.collaborations.national;
+    const intl = appData.collaborations.international;
+    // Distribuir nacionales a la izquierda, internacionales a la derecha
     const points = [
-      {x:175,y:220,type:'main',label:'Sede IPN',r:13},
-      ...appData.collaborations.national.slice(0,5).map((c,i)=>({x:165+i*10,y:225+i*8,type:'nat',label:(c.inst||'').substring(0,16),r:7})),
-      ...appData.collaborations.international.slice(0,6).map((c,i)=>({x:300+i*80,y:180+i*30,type:'intl',label:(c.inst||'').substring(0,12),r:7}))
+      {x:175,y:225,type:'main',label:'Red Salud IPN',sub:'Sede',r:15,count:''},
+      ...nat.slice(0,8).map((c,i)=>{
+        const ang = (Math.PI/2) + (i/(Math.min(nat.length,8)))*(Math.PI*0.9);
+        return {x:175+130*Math.cos(ang+Math.PI), y:225+150*Math.sin(ang)-((i%2)*20), type:'nat',
+                label:(c.inst||''), sub:c.country||'México', r:8, count:c.projects_count||c.projects||0};
+      }),
+      ...intl.slice(0,8).map((c,i)=>({x:430+((i%4)*110), y:130+Math.floor(i/4)*150+(i%2)*30, type:'intl',
+                label:(c.inst||''), sub:c.country||c.pais||'Internacional', r:8, count:c.projects_count||c.projects||0}))
     ];
     const col={main:'#6A1537',nat:'#1E7D35',intl:'#C8960C'};
     svg.innerHTML=`<rect width="900" height="450" fill="#F3EDE3"/>
       ${Array.from({length:23},(_,i)=>`<line x1="${i*40}" y1="0" x2="${i*40}" y2="450" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
       ${Array.from({length:12},(_,i)=>`<line x1="0" y1="${i*40}" x2="900" y2="${i*40}" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
       <ellipse cx="450" cy="225" rx="400" ry="180" fill="rgba(106,21,55,0.04)" stroke="rgba(106,21,55,0.08)" stroke-width="1"/>
-      ${points.slice(1).map(p=>`<line x1="175" y1="220" x2="${p.x}" y2="${p.y}" stroke="${col[p.type]}" stroke-width="1.2" stroke-dasharray="${p.type==='intl'?'5,3':'none'}" opacity="0.45"/>`).join('')}
-      ${points.map(p=>`<g><circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="${col[p.type]}" opacity="0.85" stroke="white" stroke-width="1.5"/>${p.r>8?`<text x="${p.x}" y="${p.y+p.r+12}" text-anchor="middle" font-size="9" fill="${col[p.type]}" font-family="Montserrat,Arial">${p.label}</text>`:''}</g>`).join('')}
-      <text x="14" y="438" font-size="9" fill="rgba(106,21,55,0.35)" font-family="Montserrat,Arial" letter-spacing="1">RED DE SALUD IPN · REI06-RSAL · COLABORACIONES</text>`;
+      ${points.slice(1).map(p=>`<line x1="175" y1="225" x2="${p.x}" y2="${p.y}" stroke="${col[p.type]}" stroke-width="1.2" stroke-dasharray="${p.type==='intl'?'5,3':'none'}" opacity="0.4"/>`).join('')}
+      ${points.map(p=>{
+        const tooltip = p.type==='main' ? 'Red de Salud IPN · Sede' : `${p.label}\n${p.sub}${p.count?` · ${p.count} artículo(s)`:''}`;
+        return `<g style="cursor:pointer;">
+          <circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="${col[p.type]}" opacity="0.9" stroke="white" stroke-width="1.5">
+            <title>${tooltip}</title>
+          </circle>
+          ${p.r>10?`<text x="${p.x}" y="${p.y+p.r+13}" text-anchor="middle" font-size="9" font-weight="700" fill="${col[p.type]}" font-family="Montserrat,Arial">${p.label.substring(0,18)}</text>`
+                  :`<text x="${p.x}" y="${p.y-p.r-5}" text-anchor="middle" font-size="8" fill="${col[p.type]}" font-family="Montserrat,Arial">${p.label.substring(0,16)}${p.label.length>16?'…':''}</text>`}
+        </g>`;
+      }).join('')}
+      <text x="14" y="438" font-size="9" fill="rgba(106,21,55,0.35)" font-family="Montserrat,Arial" letter-spacing="1">RED DE SALUD IPN · REI06-RSAL · Pasa el cursor sobre cada nodo para ver detalles</text>`;
   }
 
   // ── Colaboraciones internas (coautorías entre miembros) ──
@@ -2763,6 +2995,81 @@ let _pdfLibReady=false,_pdfLibLoading=false;
 function loadPdfLib(cb){if(_pdfLibReady){cb();return;}if(_pdfLibLoading){setTimeout(()=>loadPdfLib(cb),300);return;}_pdfLibLoading=true;const s=document.createElement('script');s.type='text/javascript';s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';s.onload=()=>{try{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';_pdfLibReady=true;cb();}catch(e){_pdfLibLoading=false;cb(e);}};s.onerror=()=>{_pdfLibLoading=false;cb(new Error('Error cargando pdf.js'));};document.head.appendChild(s);}
 
 async function extractTextFromPDF(buf){const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;let items=[];for(let p=1;p<=pdf.numPages;p++){const pg=await pdf.getPage(p);const tc=await pg.getTextContent();tc.items.forEach(it=>{if(it.str&&it.str.trim())items.push(it.str.trim());});items.push('|||PAGE|||');}return items;}
+
+// Lee los CAMPOS DE FORMULARIO del PDF de ficha de registro (más confiable que texto)
+async function extractFormFields(buf){
+  const pdf = await window.pdfjsLib.getDocument({data:buf}).promise;
+  const fields = {};
+  // Método 1: getFieldObjects (rápido, si el PDF tiene AcroForm)
+  try{
+    const objs = await pdf.getFieldObjects();
+    if(objs){
+      Object.entries(objs).forEach(([name, arr])=>{
+        const f = Array.isArray(arr) ? arr[0] : arr;
+        if(f && f.value != null && f.value !== '') fields[name] = String(f.value).trim();
+      });
+    }
+  }catch(e){ /* seguir con método 2 */ }
+  // Método 2: recorrer anotaciones de cada página (respaldo)
+  if(Object.keys(fields).length === 0){
+    for(let p=1;p<=pdf.numPages;p++){
+      const pg = await pdf.getPage(p);
+      const anns = await pg.getAnnotations();
+      anns.forEach(a=>{
+        if(a.fieldName && a.fieldValue!=null && String(a.fieldValue).trim()!==''){
+          fields[a.fieldName] = String(a.fieldValue).trim();
+        }
+      });
+    }
+  }
+  return fields;
+}
+
+// Mapea el Área de la Red al área interna del selector
+function mapAreaRed(areaRed){
+  const t = (areaRed||'').toLowerCase();
+  if(/cr[oó]nic|degenerat/.test(t)) return 'Enfermedades crónico-degenerativas';
+  if(/infecto|contagios|infeccios/.test(t)) return 'Enfermedades infecto-contagiosas';
+  if(/perinatal|embarazo|gestac/.test(t)) return 'Enfermedades perinatales y del embarazo';
+  if(/aliment|nutrici/.test(t)) return 'Alimentación y nutrición';
+  if(/conduct/.test(t)) return 'Conducta';
+  return '';
+}
+
+// Extrae el ID de ORCID de una liga o texto
+function extraerORCID(texto){
+  if(!texto) return '';
+  const m = texto.match(/(\d{4}-\d{4}-\d{4}-\d{3}[\dX])/i);
+  return m ? m[1] : '';
+}
+
+// Parsea la ficha de registro a partir de los campos de formulario
+function parseFichaRegistro(fields){
+  const nombre = [fields.nombre, fields.apellido1, fields.apellido2].filter(Boolean).map(s=>toTitleCase(s)).join(' ').trim();
+  const orcid = extraerORCID(fields.orcid);
+  const lines = [fields.linea1, fields.linea2].filter(Boolean).map(s=>toTitleCase(s));
+  const areaRed = fields.area_red || '';
+  // La unidad viene del dropdown como "ESM — Escuela Superior de Medicina"; tomar solo la sigla
+  let unit = (fields.unidad||'').trim();
+  const siglaMatch = unit.match(/^([A-ZÁÉÍÓÚÑ0-9\-]+)\s*[—–\-]/);
+  if(siglaMatch) unit = siglaMatch[1].trim();
+  else unit = unit.toUpperCase();
+  return {
+    nombre,
+    sexo: fields.sexo || '',
+    unit,
+    dept: fields.departamento ? toTitleCase(fields.departamento) : '',
+    laboratorio: fields.laboratorio || '',
+    ext: fields.extension || '',
+    email: (fields.correo||'').toLowerCase().trim(),
+    lines,
+    sni: fields.snii || 'No aplica',
+    areaRed: mapAreaRed(areaRed) || areaRed,
+    orcid,
+    scopus: fields.scopus || '',
+    scholar: fields.scholar || ''
+  };
+}
 
 // ── Utilidad: convertir TEXTO EN MAYÚSCULAS a Formato Título ──
 function toTitleCase(str){
@@ -2905,35 +3212,39 @@ function handleCVUFile(input){
     const reader=new FileReader();
     reader.onload=async e=>{
       try{
-        document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-warn" style="font-size:13px;">🔄 Extrayendo datos del Perfil Único Rizoma…</div>`;
-        const items=await extractTextFromPDF(e.target.result);const d=parseCVURizoma(items);
-        if(d.nombre)document.getElementById('cvu-name').value=d.nombre;
-        if(d.cvu)document.getElementById('cvu-number').value=d.cvu;
-        if(d.inst)document.getElementById('cvu-institution').value=d.inst;
-        if(d.unit)document.getElementById('cvu-unit').value=d.unit;
-        if(d.orcid)document.getElementById('cvu-orcid').value=d.orcid;
-        if(d.email)document.getElementById('cvu-email').value=d.email;
-        if(d.bio)document.getElementById('cvu-bio').value=d.bio;
-        if(d.lines.length)document.getElementById('cvu-lines').value=d.lines.join(', ');
+        document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-warn" style="font-size:13px;">🔄 Leyendo campos de la ficha de registro…</div>`;
+        const fields = await extractFormFields(e.target.result);
+        if(Object.keys(fields).length === 0){
+          document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-err" style="font-size:13px;">✕ El PDF no contiene campos de formulario. Asegúrate de usar la plantilla oficial y de haberla guardado con los datos escritos.</div>`;
+          return;
+        }
+        const d = parseFichaRegistro(fields);
+        // Volcar a los campos del formulario
+        if(d.nombre) document.getElementById('cvu-name').value=d.nombre;
+        if(d.sexo) document.getElementById('cvu-sexo').value=d.sexo;
+        if(d.unit) document.getElementById('cvu-unit').value=d.unit;
+        if(d.dept) document.getElementById('cvu-dept').value=d.dept;
+        if(d.laboratorio) document.getElementById('cvu-lab').value=d.laboratorio;
+        if(d.ext) document.getElementById('cvu-ext').value=d.ext;
+        if(d.email) document.getElementById('cvu-email').value=d.email;
+        if(d.orcid) document.getElementById('cvu-orcid').value=d.orcid;
+        if(d.scopus) document.getElementById('cvu-scopus').value=d.scopus;
+        if(d.scholar) document.getElementById('cvu-scholar').value=d.scholar;
+        if(d.lines.length) document.getElementById('cvu-lines').value=d.lines.join(', ');
         const sniSel=document.getElementById('cvu-sni');for(const o of sniSel.options){if(o.value===d.sni){sniSel.value=d.sni;break;}}
-        document.getElementById('cvu-area').value=d.area||'Básica';
-        window._cvuAreaCompleta=d.areaCompleta;window._cvuDisciplina=d.disciplina;window._cvuSubdisciplina=d.subdisciplina;
-        const campos=[d.nombre&&'Nombre',d.cvu&&'CVU',d.orcid&&'ORCID',d.email&&'Correo IPN',d.unit&&'Unidad',d.sni!=='No aplica'&&'SNI',d.inst&&'Institución',d.bio&&'Semblanza',d.lines.length&&'Líneas'].filter(Boolean);
+        if(d.areaRed){const arSel=document.getElementById('cvu-area-red');for(const o of arSel.options){if(o.value===d.areaRed){arSel.value=d.areaRed;break;}}}
+        const campos=[d.nombre&&'Nombre',d.email&&'Correo',d.unit&&'Unidad',d.dept&&'Depto',d.laboratorio&&'Laboratorio',d.ext&&'Extensión',d.sni!=='No aplica'&&'SNII',d.areaRed&&'Área Red',d.orcid&&'ORCID',d.scopus&&'Scopus',d.scholar&&'Scholar',d.lines.length&&'Líneas'].filter(Boolean);
         const orcidNote = d.orcid
           ? '<div style="font-size:11.5px;color:var(--guinda);margin-top:6px;">📚 Al guardar, las publicaciones se importarán automáticamente desde ORCID.</div>'
-          : '<div style="font-size:11.5px;color:#8B6914;margin-top:6px;">⚠ Sin ORCID detectado — no se podrán importar publicaciones automáticamente.</div>';
-        document.getElementById('cvu-result-area').innerHTML=campos.length>=3
-          ?`<div class="cvu-ok"><div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#1E7D35;margin-bottom:6px;">✓ Extracción exitosa</div><div style="font-size:12px;color:var(--text2);">${campos.join(' · ')}</div>${orcidNote}<div style="font-size:11.5px;color:var(--text3);margin-top:6px;">Revisa y corrige los datos antes de guardar.</div></div>`
-          :`<div class="cvu-warn"><div style="font-size:12.5px;color:#8B6914;">Extracción parcial — completa el formulario manualmente con los datos del PDF.</div></div>`;
-        notify(`✓ ${campos.length} campos extraídos del CVU Rizoma`);
+          : '<div style="font-size:11.5px;color:#8B6914;margin-top:6px;">⚠ Sin ORCID válido — no se podrán importar publicaciones automáticamente.</div>';
+        document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-ok"><div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#1E7D35;margin-bottom:6px;">✓ Ficha leída correctamente</div><div style="font-size:12px;color:var(--text2);">${campos.join(' · ')}</div>${orcidNote}<div style="font-size:11.5px;color:var(--text3);margin-top:6px;">Revisa los datos antes de guardar.</div></div>`;
+        notify(`✓ ${campos.length} campos leídos de la ficha`);
       }catch(ex){console.error(ex);document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-err" style="font-size:13px;">✕ Error al procesar el PDF. Captura los datos manualmente.</div>`;}
     };reader.readAsArrayBuffer(file);
   });
 }
 
 function handleCVUDrop(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf')handleCVUFile([f]);}
-
-function processCVUURL(){const u=document.getElementById('cvu-url').value;if(!u)return;notify('Procesando URL de Rizoma…');}
 
 // ═══════════════════════════════════════════════════════════
 // CONEXIÓN UI → SUPABASE (formularios y botones)
@@ -3000,22 +3311,24 @@ function deleteProject(id){ deleteProjectDB(id); }
 async function saveCVUResearcher(){
   const name=document.getElementById('cvu-name').value.trim();
   if(!name){alert('El nombre es obligatorio');return;}
-  const orcid=document.getElementById('cvu-orcid').value.trim();
+  const orcid=extraerORCID(document.getElementById('cvu-orcid').value.trim()) || document.getElementById('cvu-orcid').value.trim();
+  const areaRed=document.getElementById('cvu-area-red').value;
   const data = {
     name,
-    cvu:document.getElementById('cvu-number').value,
     unit:document.getElementById('cvu-unit').value,
-    inst:document.getElementById('cvu-institution').value,
-    area:document.getElementById('cvu-area').value,
-    areaCompleta:window._cvuAreaCompleta||'',
-    disciplina:window._cvuDisciplina||'',
-    subdisciplina:window._cvuSubdisciplina||'',
+    dept:document.getElementById('cvu-dept').value,
+    inst:'Instituto Politécnico Nacional',
+    area:areaRed,             // el área interna ahora es el área de la Red
+    areaCompleta:areaRed,
+    sexo:document.getElementById('cvu-sexo').value,
+    laboratorio:document.getElementById('cvu-lab').value,
     sni:document.getElementById('cvu-sni').value,
     orcid,
+    scopus:document.getElementById('cvu-scopus').value,
+    scholar:document.getElementById('cvu-scholar').value,
     email:document.getElementById('cvu-email').value,
     ext:document.getElementById('cvu-ext').value,
     lines:document.getElementById('cvu-lines').value.split(',').map(s=>s.trim()).filter(Boolean),
-    bio:document.getElementById('cvu-bio').value,
     pubs:0, rizoma:'https://rizoma.conacyt.mx/'
   };
   const ok = await saveResearcher(data);
@@ -3078,9 +3391,307 @@ async function saveCVUResearcher(){
     }
   }
 
-  window._cvuAreaCompleta=null;window._cvuDisciplina=null;window._cvuSubdisciplina=null;window._cvuArticulos=null;
-  ['cvu-name','cvu-number','cvu-institution','cvu-unit','cvu-orcid','cvu-email','cvu-lines','cvu-bio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['cvu-name','cvu-sexo','cvu-unit','cvu-dept','cvu-lab','cvu-ext','cvu-orcid','cvu-scopus','cvu-scholar','cvu-email','cvu-lines'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const arSel=document.getElementById('cvu-area-red');if(arSel)arSel.value='';
 }
+
+// ═══════════════════════════════════════════════════════════
+// SINCRONIZACIÓN AUTOMÁTICA CON ORCID
+// Revisa el ORCID de cada investigador y agrega artículos nuevos
+// ═══════════════════════════════════════════════════════════
+
+// Importa las publicaciones de UN investigador desde su ORCID.
+// Devuelve {nuevas, coautorias}. Solo agrega lo que no existe.
+async function importarPublicacionesORCID(researcherName, orcid, opts={}){
+  if(!orcid || !db || !isAdmin) return {nuevas:0, coautorias:0};
+  await loadPublications();
+  let works;
+  try { works = await fetchORCIDWorks(orcid); }
+  catch(e){ return {nuevas:0, coautorias:0, error:true}; }
+  let nuevas=0, coautorias=0;
+  for(const w of works){
+    if(!w.title) continue;
+    const yaExiste = (w.doi && appData.publications.find(p=>p.doi && p.doi.toLowerCase()===w.doi.toLowerCase()))
+                  || appData.publications.find(p=>normalizeJournal(p.title)===normalizeJournal(w.title));
+    if(yaExiste){
+      const added = await addCoauthorToPublication(w.doi, w.title, researcherName);
+      if(added) coautorias++;
+    }else{
+      const r = await savePublication({
+        title:w.title, type:'Artículo', year:w.year||new Date().getFullYear(),
+        authors:w.authors||researcherName, journal:w.journal||'', doi:w.doi||'',
+        if:'', quartile:'', issn:w.issn||'', url:w.url||'',
+        networkAuthors:[researcherName]
+      });
+      if(r){ nuevas++; await loadPublications(); }
+    }
+  }
+  return {nuevas, coautorias, works};
+}
+
+// Sincroniza TODOS los investigadores con ORCID
+let _syncingORCID = false;
+async function sincronizarTodosORCID(){
+  if(!db || !isAdmin){ openLogin(); return; }
+  if(_syncingORCID){ notify('Ya hay una sincronización en curso…'); return; }
+  _syncingORCID = true;
+  await loadResearchers();
+  const conOrcid = appData.researchers.filter(r => r.orcid && r.orcid.trim());
+  if(!conOrcid.length){ notify('Ningún investigador tiene ORCID registrado'); _syncingORCID=false; return; }
+  let totalNuevas = 0;
+  notify(`🔄 Sincronizando ${conOrcid.length} investigadores con ORCID…`);
+  for(let i=0;i<conOrcid.length;i++){
+    const r = conOrcid[i];
+    setSyncStatus('loading', `ORCID ${i+1}/${conOrcid.length}: ${r.name.split(' ').slice(0,2).join(' ')}…`);
+    const res = await importarPublicacionesORCID(r.name, r.orcid);
+    totalNuevas += res.nuevas||0;
+    await new Promise(res=>setTimeout(res, 200)); // cortesía con ORCID
+  }
+  await loadPublications();
+  refreshActiveView();
+  setSyncStatus('connected', 'Sincronizado');
+  notify(totalNuevas>0 ? `✓ ${totalNuevas} publicaciones nuevas importadas desde ORCID` : '✓ Todo al día — sin publicaciones nuevas en ORCID');
+  _syncingORCID = false;
+}
+
+// Sincronización periódica automática (cada 6 horas mientras la pestaña esté abierta como admin)
+let _orcidAutoTimer = null;
+function iniciarAutoSyncORCID(){
+  if(_orcidAutoTimer) clearInterval(_orcidAutoTimer);
+  // Cada 6 horas
+  _orcidAutoTimer = setInterval(() => {
+    if(isAdmin && db && !_syncingORCID){
+      sincronizarTodosORCID();
+    }
+  }, 6*60*60*1000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// CALENDARIO DE EVENTOS
+// Muestra eventos próximos y en curso; oculta los concluidos.
+// ═══════════════════════════════════════════════════════════
+let _calYear, _calMonth; // mes visible
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const DOW = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+function hoyISO(){ const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+function parseFecha(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+
+async function loadEvents(){
+  if(!db) return;
+  const { data, error } = await db.from('events').select('*').order('start_date');
+  if(error){ console.warn('loadEvents:', error.message); appData.events=[]; return; }
+  appData.events = data||[];
+}
+
+// Un evento está "vigente" si aún no ha concluido (su fecha de fin >= hoy)
+function eventoVigente(ev){
+  const hoy = hoyISO();
+  const fin = parseFecha(ev.end_date) || parseFecha(ev.start_date);
+  return fin >= hoy;
+}
+function estadoEvento(ev){
+  const hoy = hoyISO();
+  const ini = parseFecha(ev.start_date);
+  const fin = parseFecha(ev.end_date) || ini;
+  if(ini <= hoy && fin >= hoy) return 'ongoing';   // en curso
+  if(ini > hoy) return 'upcoming';                  // próximo
+  return 'past';
+}
+
+function renderCalendar(){
+  const grid = document.getElementById('calendar-grid');
+  if(!grid) return;
+  if(_calYear==null){ const h=hoyISO(); _calYear=h.getFullYear(); _calMonth=h.getMonth(); }
+  document.getElementById('cal-month-title').textContent = `${MESES[_calMonth]} ${_calYear}`;
+
+  const primerDia = new Date(_calYear, _calMonth, 1);
+  const inicioSemana = primerDia.getDay(); // 0=Dom
+  const diasMes = new Date(_calYear, _calMonth+1, 0).getDate();
+  const hoy = hoyISO();
+
+  // Solo eventos vigentes (no concluidos)
+  const eventos = (appData.events||[]).filter(eventoVigente);
+
+  let html = '<div class="cal-grid">';
+  DOW.forEach(d=> html += `<div class="cal-dow">${d}</div>`);
+  // Celdas vacías antes del día 1
+  for(let i=0;i<inicioSemana;i++) html += '<div class="cal-cell other-month"></div>';
+  for(let dia=1; dia<=diasMes; dia++){
+    const fecha = new Date(_calYear, _calMonth, dia);
+    const esHoy = fecha.getTime()===hoy.getTime();
+    // Eventos que ocurren este día (entre inicio y fin)
+    const evsDia = eventos.filter(ev=>{
+      const ini=parseFecha(ev.start_date), fin=parseFecha(ev.end_date)||ini;
+      return fecha>=ini && fecha<=fin;
+    });
+    html += `<div class="cal-cell${esHoy?' today':''}">
+      <div class="cal-daynum">${dia}</div>
+      ${evsDia.slice(0,3).map(ev=>{
+        const est=estadoEvento(ev);
+        return `<div class="cal-ev ${est==='ongoing'?'ongoing':''} type-${(ev.event_type||'').replace(/\s/g,'')}" onclick="openEventModal('${ev.id}')" title="${(ev.title||'').replace(/"/g,'&quot;')}">${ev.title}</div>`;
+      }).join('')}
+      ${evsDia.length>3?`<div style="font-size:8px;color:var(--text3);margin-top:1px;">+${evsDia.length-3} más</div>`:''}
+    </div>`;
+  }
+  html += '</div>';
+  grid.innerHTML = html;
+  renderEventsList();
+}
+
+function renderEventsList(){
+  const list = document.getElementById('events-list');
+  if(!list) return;
+  const hoy = hoyISO();
+  // Vigentes, ordenados: en curso primero, luego próximos por fecha
+  const vigentes = (appData.events||[]).filter(eventoVigente).sort((a,b)=>{
+    const ea=estadoEvento(a), eb=estadoEvento(b);
+    if(ea!==eb) return ea==='ongoing'?-1:1;
+    return parseFecha(a.start_date)-parseFecha(b.start_date);
+  });
+  if(!vigentes.length){
+    list.innerHTML = '<div class="empty-state" style="padding:24px;"><div class="empty-desc">No hay eventos próximos ni en curso.</div></div>';
+    return;
+  }
+  list.innerHTML = vigentes.map(ev=>{
+    const est = estadoEvento(ev);
+    const ini = parseFecha(ev.start_date);
+    const fin = parseFecha(ev.end_date);
+    const rango = fin && fin.getTime()!==ini.getTime()
+      ? `${ini.getDate()} ${MESES_CORTO[ini.getMonth()]} – ${fin.getDate()} ${MESES_CORTO[fin.getMonth()]}`
+      : `${ini.getDate()} ${MESES_CORTO[ini.getMonth()]} ${ini.getFullYear()}`;
+    return `<div class="ev-item" onclick="openEventModal('${ev.id}')">
+      <div class="ev-date-badge ${est==='ongoing'?'ongoing':''}">
+        <div class="ev-date-day">${ini.getDate()}</div>
+        <div class="ev-date-mon">${MESES_CORTO[ini.getMonth()]}</div>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span class="ev-status ${est}">${est==='ongoing'?'En curso':'Próximo'}</span>
+          <span style="font-size:10px;color:var(--text3);">${ev.event_type||''}</span>
+        </div>
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--guinda);margin-top:3px;line-height:1.3;">${ev.title}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px;">📅 ${rango}${ev.location?` · 📍 ${ev.location}`:''}</div>
+        ${ev.description?`<div style="font-size:11.5px;color:var(--text3);margin-top:3px;line-height:1.4;">${ev.description.substring(0,110)}${ev.description.length>110?'…':''}</div>`:''}
+        ${ev.url?`<a href="${ev.url}" target="_blank" onclick="event.stopPropagation()" class="pl-link" style="margin-top:5px;display:inline-block;">Más info ↗</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function calPrevMonth(){ _calMonth--; if(_calMonth<0){_calMonth=11;_calYear--;} renderCalendar(); }
+function calNextMonth(){ _calMonth++; if(_calMonth>11){_calMonth=0;_calYear++;} renderCalendar(); }
+function calToday(){ const h=hoyISO(); _calYear=h.getFullYear(); _calMonth=h.getMonth(); renderCalendar(); }
+
+function openEventModal(id){
+  if(!isAdmin){ if(id){/* ver detalle no-admin */} else return; }
+  const modal = document.getElementById('modal-event');
+  const delBtn = document.getElementById('event-delete-btn');
+  if(id){
+    const ev = (appData.events||[]).find(e=>String(e.id)===String(id));
+    if(!ev) return;
+    document.getElementById('event-modal-title').textContent = isAdmin?'Editar evento':ev.title;
+    document.getElementById('event-id').value = ev.id;
+    document.getElementById('event-title').value = ev.title||'';
+    document.getElementById('event-type').value = ev.event_type||'Evento';
+    document.getElementById('event-location').value = ev.location||'';
+    document.getElementById('event-start').value = ev.start_date||'';
+    document.getElementById('event-end').value = ev.end_date||'';
+    document.getElementById('event-url').value = ev.url||'';
+    document.getElementById('event-desc').value = ev.description||'';
+    if(delBtn) delBtn.style.display = isAdmin?'inline-flex':'none';
+  }else{
+    document.getElementById('event-modal-title').textContent = 'Nuevo evento';
+    ['event-id','event-title','event-location','event-start','event-end','event-url','event-desc'].forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
+    document.getElementById('event-type').value='Congreso';
+    if(delBtn) delBtn.style.display='none';
+  }
+  modal.classList.add('open');
+}
+
+async function saveEvent(){
+  if(!isAdmin || !db){ openLogin(); return; }
+  const title = document.getElementById('event-title').value.trim();
+  const start = document.getElementById('event-start').value;
+  if(!title || !start){ alert('El título y la fecha de inicio son obligatorios'); return; }
+  const record = {
+    title, event_type: document.getElementById('event-type').value,
+    location: document.getElementById('event-location').value.trim(),
+    start_date: start,
+    end_date: document.getElementById('event-end').value || null,
+    url: document.getElementById('event-url').value.trim(),
+    description: document.getElementById('event-desc').value.trim()
+  };
+  const id = document.getElementById('event-id').value;
+  let error;
+  if(id){ ({error} = await db.from('events').update(record).eq('id', id)); }
+  else { ({error} = await db.from('events').insert(record)); }
+  if(error){ notify('✕ Error: '+error.message); return; }
+  notify(id?'✓ Evento actualizado':'✓ Evento agregado');
+  closeModal('modal-event');
+  await loadEvents();
+  renderCalendar();
+}
+
+async function deleteEvent(){
+  if(!isAdmin || !db) return;
+  const id = document.getElementById('event-id').value;
+  if(!id) return;
+  if(!confirm('¿Eliminar este evento?')) return;
+  const { error } = await db.from('events').delete().eq('id', id);
+  if(error){ notify('✕ Error: '+error.message); return; }
+  notify('Evento eliminado');
+  closeModal('modal-event');
+  await loadEvents();
+  renderCalendar();
+}
+
+// Carga directorio_import.json y da de alta a los investigadores
+// que aún no existan (por nombre). No duplica.
+// ═══════════════════════════════════════════════════════════
+let _importando = false;
+async function importarDirectorio(){
+  if(!isAdmin || !db){ openLogin(); return; }
+  if(_importando){ notify('Ya hay una importación en curso…'); return; }
+  if(!confirm('¿Importar el directorio preliminar de investigadores? Se agregarán los que aún no existan en la Red.')) return;
+  _importando = true;
+  notify('🔄 Descargando directorio…');
+  let registros;
+  try{
+    const res = await fetch('directorio_import.json');
+    if(!res.ok) throw new Error('no encontrado');
+    registros = await res.json();
+  }catch(e){
+    notify('✕ No se encontró directorio_import.json en el servidor. Súbelo al repositorio junto al index.html.');
+    _importando = false; return;
+  }
+  await loadResearchers();
+  const existentes = new Set(appData.researchers.map(r => r.name.toLowerCase().trim()));
+  let nuevos=0, saltados=0, errores=0;
+  for(let i=0;i<registros.length;i++){
+    const r = registros[i];
+    if(existentes.has(r.name.toLowerCase().trim())){ saltados++; continue; }
+    setSyncStatus('loading', `Importando ${i+1}/${registros.length}…`);
+    const record = {
+      name: r.name, dept: r.area||'', unit: r.unit||'', inst: r.inst||'Instituto Politécnico Nacional',
+      area: r.area||'', area_completa: (r.lines||[]).join(' · '),
+      sni: r.sni||'No aplica', orcid: r.orcid||'', email: r.email||'',
+      lines: Array.isArray(r.lines)?r.lines:[], pubs: 0,
+      rizoma: 'https://rizoma.conacyt.mx/'
+    };
+    const { error } = await db.from('researchers').insert(record);
+    if(error){ errores++; console.warn('Import error:', r.name, error.message); }
+    else { nuevos++; existentes.add(r.name.toLowerCase().trim()); }
+    if(i % 10 === 0) await new Promise(res=>setTimeout(res, 50));
+  }
+  await loadResearchers();
+  refreshActiveView();
+  setSyncStatus('connected', 'Sincronizado');
+  notify(`✓ Importación completa: ${nuevos} nuevos · ${saltados} ya existían${errores?` · ${errores} errores`:''}`);
+  _importando = false;
+}
+
 
 // ═══════════════════════════════════════════════════════════
 // INIT
@@ -3096,6 +3707,8 @@ async function saveCVUResearcher(){
     await initSupabase();
     renderDashboard();
     renderMetrics();
+    // Iniciar sincronización automática periódica con ORCID (cada 6h, solo admin)
+    iniciarAutoSyncORCID();
     // Si entró con ?admin y ya hay conexión, abrir login
     if (window.location.search.includes('admin')) setTimeout(openLogin, 600);
   } else {
