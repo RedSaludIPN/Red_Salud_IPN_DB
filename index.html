@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>REI06-RSAL | Red de Salud — Instituto Politécnico Nacional</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 /* ════════════════════════════════════════════════════
@@ -473,6 +474,8 @@ body {
 }
 .rc-detail-val { font-size: 12.5px; color: var(--text); line-height: 1.4; }
 .rc-expand { transform: rotate(0deg); }
+.rc-unit-full { font-size: 11px; color: var(--gold); font-family: var(--font-head); font-weight: 600; margin-top: 3px; line-height: 1.3; }
+.rc-expand-panel { padding-top: 0; }
 .rc:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--guinda); }
 
 
@@ -1125,29 +1128,13 @@ body {
             <div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>
           </div>
         </div>
-
-        <!-- Factor de impacto / Top autores -->
-        <div class="chart-card">
-          <div class="chart-title">Investigadores más productivos</div>
-          <div id="top-authors-wrap">
-            <div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>
-          </div>
-        </div>
       </div>
     </div>
 
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-header"><h3>Proyectos recientes</h3><button class="btn btn-outline btn-sm" onclick="showSection('projects')">Ver todos</button></div>
-        <div class="card-body" id="dash-projects">
-          <div class="empty-state"><div class="empty-icon">📁</div><div class="empty-desc">Sin proyectos registrados aún.</div></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><h3>Investigadores de la red</h3><button class="btn btn-outline btn-sm" onclick="showSection('researchers')">Ver todos</button></div>
-        <div class="card-body" id="dash-researchers">
-          <div class="empty-state"><div class="empty-icon">👩‍🔬</div><div class="empty-desc">Sin investigadores registrados aún.</div></div>
-        </div>
+    <div class="card">
+      <div class="card-header"><h3>Proyectos recientes</h3><button class="btn btn-outline btn-sm" onclick="showSection('projects')">Ver todos</button></div>
+      <div class="card-body" id="dash-projects">
+        <div class="empty-state"><div class="empty-icon">📁</div><div class="empty-desc">Sin proyectos registrados aún.</div></div>
       </div>
     </div>
   </section>
@@ -1229,11 +1216,19 @@ body {
     <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Interconexiones</div><div class="sh-title">Mapa de Red</div></div></div>
     <div class="card">
       <div class="card-body">
+        <div class="filter-row" style="margin-bottom:14px;">
+          <button class="fc active" onclick="filterNetworkArea('all',this)">Todas las áreas</button>
+          <button class="fc" onclick="filterNetworkArea('Enfermedades crónico-degenerativas',this)">Crónico-degenerativas</button>
+          <button class="fc" onclick="filterNetworkArea('Enfermedades infecto-contagiosas',this)">Infecto-contagiosas</button>
+          <button class="fc" onclick="filterNetworkArea('Enfermedades perinatales y del embarazo',this)">Perinatales</button>
+          <button class="fc" onclick="filterNetworkArea('Alimentación y nutrición',this)">Alimentación y nutrición</button>
+          <button class="fc" onclick="filterNetworkArea('Conducta',this)">Conducta</button>
+        </div>
         <div id="network-container"></div>
         <div class="map-legend mt-16" id="network-legend">
           <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);"></div>Investigadores</div>
         </div>
-        <p style="font-size:11.5px;color:var(--text3);margin-top:7px;">Los colores indican el área de investigación. Las líneas doradas conectan a miembros que han publicado juntos. Pasa el cursor sobre un nodo para ver detalles, o haz clic para abrir el perfil.</p>
+        <p style="font-size:11.5px;color:var(--text3);margin-top:7px;">Cada nodo es un investigador, agrupado por área de la Red. Filtra por área para explorar cada grupo. Pasa el cursor para ver el nombre, o haz clic para abrir el perfil.</p>
       </div>
     </div>
   </section>
@@ -1304,12 +1299,20 @@ body {
       </div>
     </div>
     <div class="card mt-20">
-      <div class="card-header"><h3>Importar directorio preliminar</h3></div>
+      <div class="card-header"><h3>Importar investigadores desde Excel / CSV</h3></div>
       <div class="card-body">
         <div style="background:var(--guinda-soft);border-left:3px solid var(--guinda);border-radius:var(--radius);padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--text2);">
-          Carga masiva del directorio recopilado por los colaboradores (archivo <code>directorio_import.json</code>). Solo se agregan los investigadores que aún no existen; los repetidos se omiten. Después puedes usar <strong>Sincronizar ORCID</strong> para traer sus publicaciones.
+          Sube un archivo <strong>.xlsx</strong> o <strong>.csv</strong> con el directorio. Los investigadores que ya existan (por nombre) se <strong>actualizan</strong>; los nuevos se <strong>agregan</strong>. Después puedes usar <strong>Sincronizar ORCID</strong> para traer sus publicaciones.
+          <br><br>
+          <span style="font-size:11.5px;color:var(--text3);">Columnas reconocidas: <code>Nombre</code>, <code>Nivel SNII</code>, <code>Unidad académica</code>, <code>Área de expertiz</code>, <code>Red ORCID</code>, <code>Contacto</code> (correo). El orden no importa; se identifican por su encabezado.</span>
         </div>
-        <button class="btn btn-guinda" onclick="importarDirectorio()">📥 Importar directorio de investigadores</button>
+        <div class="dropzone" onclick="document.getElementById('xlsx-file-input').click()" ondragover="event.preventDefault();this.style.borderColor='var(--guinda)'" ondragleave="this.style.borderColor=''" ondrop="handleXlsxDrop(event)" style="padding:24px;">
+          <div class="dropzone-icon">📊</div>
+          <div class="dropzone-title">Arrastra tu Excel o CSV aquí</div>
+          <div class="dropzone-sub">o clic para seleccionar · .xlsx / .csv</div>
+        </div>
+        <input type="file" id="xlsx-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleXlsxFile(this)">
+        <div id="xlsx-result-area" style="margin-top:10px;"></div>
       </div>
     </div>
     <div class="card mt-20">
@@ -1791,7 +1794,27 @@ async function loadResearchers() {
     scholar: r.scholar || '',
     areaCompleta: r.area_completa || ''
   }));
+  recomputePubCounts();
 }
+
+// Cuenta las publicaciones reales de cada investigador (por coautoría de red o por texto de autores)
+function contarPublicaciones(researcherName){
+  if(!appData.publications) return 0;
+  const partes = researcherName.split(' ').filter(w=>w.length>2);
+  const apellido = (partes[1] || partes[0] || '').toLowerCase();
+  return appData.publications.filter(p => {
+    if(Array.isArray(p.network_authors) && p.network_authors.includes(researcherName)) return true;
+    if(apellido && p.authors && p.authors.toLowerCase().includes(apellido)) return true;
+    return false;
+  }).length;
+}
+
+// Recalcula el conteo de publicaciones de todos los investigadores en memoria
+function recomputePubCounts(){
+  if(!appData.researchers) return;
+  appData.researchers.forEach(r => { r.pubs = contarPublicaciones(r.name); });
+}
+
 
 async function loadProjects() {
   const { data, error } = await db.from('projects').select('*').order('created_at', { ascending: false });
@@ -1814,6 +1837,7 @@ async function loadPublications() {
     pdf_url: p.pdf_url || '',
     network_authors: Array.isArray(p.network_authors) ? p.network_authors : []
   }));
+  recomputePubCounts();
 }
 
 async function loadCollaborations() {
@@ -2233,18 +2257,6 @@ function renderDashboard() {
     </div>`).join('') :
     '<div class="empty-state" style="padding:24px;"><div class="empty-icon">📁</div><div class="empty-desc">Sin proyectos registrados.</div></div>';
 
-  const dr = document.getElementById('dash-researchers');
-  dr.innerHTML = appData.researchers.length ? appData.researchers.slice(0,5).map(r=>`
-    <div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border);">
-      <div style="width:36px;height:36px;border-radius:50%;background:var(--guinda);color:var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:12px;font-weight:800;flex-shrink:0;">${initials(r.name)}</div>
-      <div style="flex:1;">
-        <div style="font-family:var(--font-head);font-size:13px;font-weight:600;">${r.name}</div>
-        <div style="font-size:11px;color:var(--text3);">${r.area} · SNI ${r.sni} · ${r.unit||''}</div>
-      </div>
-      <div style="font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--guinda);">${r.pubs||0}</div>
-    </div>`).join('') :
-    '<div class="empty-state" style="padding:24px;"><div class="empty-icon">👩‍🔬</div><div class="empty-desc">Sin investigadores registrados.</div></div>';
-
   renderMetrics();
 }
 
@@ -2331,44 +2343,6 @@ function renderMetrics() {
         <span>Prom/año activo: <strong style="color:var(--guinda);">${promedio}</strong></span>
       </div>`;
   }
-
-  // ── Gráfica 3: Top autores (por aparición en pubs) ─────
-  const topWrap = document.getElementById('top-authors-wrap');
-  if (!arts.length) {
-    topWrap.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin publicaciones registradas.</div></div>';
-  } else {
-    // Contar por investigador: usar network_authors (coautores de la red) + fallback a texto de autores
-    const counts = appData.researchers.map(r => {
-      const inNetwork = arts.filter(p =>
-        Array.isArray(p.network_authors) && p.network_authors.includes(r.name)
-      ).length;
-      // Fallback: si no hay network_authors, buscar apellido en el texto de autores
-      const lastName = r.name.split(' ').filter(w=>w.length>2)[1] || r.name.split(' ')[0];
-      const byText = arts.filter(p =>
-        (!p.network_authors || !p.network_authors.length) &&
-        p.authors && p.authors.toLowerCase().includes(lastName.toLowerCase())
-      ).length;
-      return { name: r.name, unit: r.unit||r.area||'', n: inNetwork + byText };
-    }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n).slice(0,5);
-
-    if (!counts.length) {
-      topWrap.innerHTML = '<div class="empty-state" style="padding:16px;"><div class="empty-desc">Registra publicaciones con autores de la red.</div></div>';
-    } else {
-      const maxC = counts[0].n;
-      topWrap.innerHTML = counts.map((a,i) => `
-        <div class="top-author">
-          <div class="ta-rank">#${i+1}</div>
-          <div class="ta-info">
-            <div class="ta-name">${a.name.split(' ').slice(0,3).join(' ')}</div>
-            <div class="ta-unit">${a.unit}</div>
-            <div style="height:4px;background:var(--bg2);border-radius:2px;margin-top:4px;overflow:hidden;">
-              <div style="height:100%;width:${Math.round((a.n/maxC)*100)}%;background:var(--guinda);border-radius:2px;"></div>
-            </div>
-          </div>
-          <div class="ta-count">${a.n}</div>
-        </div>`).join('');
-    }
-  }
 }
 
 function tarjetaInvestigador(r){
@@ -2377,32 +2351,28 @@ function tarjetaInvestigador(r){
     <div class="rc" id="rc-${r.id}">
       <div class="rc-header" onclick="toggleResearcherCard('${r.id}')" style="cursor:pointer;">
         <div class="rc-monogram">${initials(r.name)}</div>
-        <div style="flex:1;">
+        <div style="flex:1;min-width:0;">
           <div class="rc-name">${r.name}</div>
-          <div class="rc-dept">${r.dept || r.area}</div>
-          ${r.unit ? `<span class="rc-unit" title="${unidadFull}">${r.unit}</span>` : ''}
+          <div class="rc-dept">${r.area||''}</div>
+          ${unidadFull ? `<div class="rc-unit-full">${unidadFull}</div>` : ''}
         </div>
         <span class="rc-expand" id="rc-exp-${r.id}" style="color:var(--gold);font-size:13px;transition:transform 0.2s;">▾</span>
       </div>
       <div class="rc-body">
-        <span class="rc-area">${r.area}</span>
-        ${r.bio ? `<p class="rc-bio">${r.bio.substring(0,100)}…</p>` : ''}
-        <div class="rc-tags">${(r.lines||[]).slice(0,3).map(l=>`<span class="rc-tag">${l}</span>`).join('')}</div>
-        <div class="rc-meta">
-          <span>📄 ${r.pubs||0} pubs</span>
-          <span>🎓 SNI ${r.sni}</span>
-        </div>
-        <div class="rc-expand-panel" id="rc-panel-${r.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-          ${unidadFull ? `<div class="rc-detail-row"><span class="rc-detail-ic">🏛️</span><div><div class="rc-detail-lbl">Unidad Académica</div><div class="rc-detail-val">${unidadFull}${r.unit?` <span style="color:var(--text3);">(${r.unit})</span>`:''}</div></div></div>` : ''}
-          ${r.inst ? `<div class="rc-detail-row"><span class="rc-detail-ic">🏢</span><div><div class="rc-detail-lbl">Institución</div><div class="rc-detail-val">${r.inst}</div></div></div>` : ''}
+        <div class="rc-expand-panel" id="rc-panel-${r.id}" style="display:none;">
+          ${r.bio ? `<p class="rc-bio" style="margin-bottom:10px;">${r.bio.substring(0,160)}${r.bio.length>160?'…':''}</p>` : ''}
+          <div class="rc-detail-row"><span class="rc-detail-ic">🎓</span><div><div class="rc-detail-lbl">Nivel SNII</div><div class="rc-detail-val">${r.sni||'No aplica'}</div></div></div>
+          ${unidadFull ? `<div class="rc-detail-row"><span class="rc-detail-ic">🏛️</span><div><div class="rc-detail-lbl">Unidad Académica</div><div class="rc-detail-val">${unidadFull}</div></div></div>` : ''}
           ${r.laboratorio ? `<div class="rc-detail-row"><span class="rc-detail-ic">🔬</span><div><div class="rc-detail-lbl">Laboratorio</div><div class="rc-detail-val">${r.laboratorio}</div></div></div>` : ''}
           ${r.email ? `<div class="rc-detail-row"><span class="rc-detail-ic">✉️</span><div><div class="rc-detail-lbl">Correo institucional</div><div class="rc-detail-val"><a href="mailto:${r.email}" onclick="event.stopPropagation()" style="color:var(--guinda);font-weight:600;">${r.email}</a></div></div></div>` : ''}
           ${r.ext ? `<div class="rc-detail-row"><span class="rc-detail-ic">☎️</span><div><div class="rc-detail-lbl">Extensión personal</div><div class="rc-detail-val">${r.ext}</div></div></div>` : ''}
           ${r.ext_laboratorio ? `<div class="rc-detail-row"><span class="rc-detail-ic">📞</span><div><div class="rc-detail-lbl">Extensión del laboratorio</div><div class="rc-detail-val">${r.ext_laboratorio}</div></div></div>` : ''}
           ${(r.lines&&r.lines.length) ? `<div class="rc-detail-row"><span class="rc-detail-ic">📚</span><div><div class="rc-detail-lbl">Líneas de investigación</div><div class="rc-detail-val">${r.lines.join(', ')}</div></div></div>` : ''}
+          <div class="rc-detail-row"><span class="rc-detail-ic">📄</span><div><div class="rc-detail-lbl">Publicaciones</div><div class="rc-detail-val">${r.pubs||0}</div></div></div>
           <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
             ${r.orcid?`<a class="pl-link" href="https://orcid.org/${r.orcid}" target="_blank" onclick="event.stopPropagation()">ORCID</a>`:''}
-            <a class="pl-link" href="https://scholar.google.com/scholar?q=${encodeURIComponent(r.name)}" target="_blank" onclick="event.stopPropagation()">Scholar</a>
+            ${r.scopus?`<a class="pl-link" href="${r.scopus}" target="_blank" onclick="event.stopPropagation()">Scopus</a>`:''}
+            <a class="pl-link" href="${r.scholar||('https://scholar.google.com/scholar?q='+encodeURIComponent(r.name))}" target="_blank" onclick="event.stopPropagation()">Scholar</a>
             <button class="pl-link" onclick="event.stopPropagation();showResearcherDetail('${r.id}')" style="cursor:pointer;background:none;font-family:var(--font-head);">Ver perfil →</button>
             <button class="pl-link admin-only" onclick="event.stopPropagation();openResearcherEdit('${r.id}')" style="cursor:pointer;background:var(--gold-pale);border-color:var(--gold);color:var(--gold);font-family:var(--font-head);">✏️ Editar</button>
           </div>
@@ -2532,8 +2502,7 @@ function showResearcherDetail(id) {
   document.getElementById('detail-dept').textContent = (r.dept||r.area) + (r.unit?' · '+r.unit:'') + (r.inst?' · '+r.inst:'');
 
   document.getElementById('detail-info-content').innerHTML = `
-    <div class="info-row"><span class="ir-label">Institución</span><span class="ir-value">${r.inst||'—'}</span></div>
-    <div class="info-row"><span class="ir-label">Unidad académica</span><span class="ir-value">${r.unit?nombreUnidad(r.unit)+(r.unit!==nombreUnidad(r.unit)?` (${r.unit})`:''):'—'}</span></div>
+    <div class="info-row"><span class="ir-label">Unidad académica</span><span class="ir-value">${r.unit?nombreUnidad(r.unit):'—'}</span></div>
     <div class="info-row"><span class="ir-label">Área de conocimiento</span><span class="ir-value">${r.areaCompleta||r.area||'—'}</span></div>
     <div class="info-row"><span class="ir-label">Nivel SNI</span><span class="ir-value">${r.sni||'—'}</span></div>
     <div class="info-row"><span class="ir-label">CVU Rizoma</span><span class="ir-value">${r.cvu?`<a href="https://rizoma.conacyt.mx/" target="_blank" style="color:var(--guinda);">#${r.cvu} ↗</a>`:'No registrado'}</span></div>
@@ -2656,84 +2625,112 @@ function filterPublications(q) { renderPublications(appData.publications.filter(
 
 function filterPubType(t,btn) { document.querySelectorAll('.fc').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderPublications(t==='all'?appData.publications:appData.publications.filter(p=>p.type===t)); }
 
+let _networkFilter = 'all';
+const AREA_COLORS = {
+  'Enfermedades crónico-degenerativas':'#6A1537',
+  'Enfermedades infecto-contagiosas':'#1E7D35',
+  'Enfermedades perinatales y del embarazo':'#5A3080',
+  'Alimentación y nutrición':'#C8960C',
+  'Conducta':'#1A5A7A',
+  'Otra':'#888888', '':'#888888'
+};
+const AREA_CORTA = {
+  'Enfermedades crónico-degenerativas':'Crónico-deg.',
+  'Enfermedades infecto-contagiosas':'Infecto-cont.',
+  'Enfermedades perinatales y del embarazo':'Perinatales',
+  'Alimentación y nutrición':'Alim. y nutr.',
+  'Conducta':'Conducta','Otra':'Otra','':'Otra'
+};
+
+function filterNetworkArea(area, btn){
+  _networkFilter = area;
+  document.querySelectorAll('#section-network .fc').forEach(c=>c.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderNetwork();
+}
+
 function renderNetwork() {
   const container = document.getElementById('network-container');
   if (!appData.researchers.length) {
     container.innerHTML = '<div class="empty-state" style="padding:60px 20px;"><div class="empty-icon">🕸️</div><div class="empty-desc">Agrega investigadores para ver el mapa de red.</div></div>';
     return;
   }
-  const W = container.offsetWidth || 700, H = container.offsetHeight || 420;
-  const cx=W/2, cy=H/2, N=appData.researchers.length, R=Math.min(W,H)*0.32;
-  // Colores por área de investigación
-  const areaC = {
-    'Enfermedades crónico-degenerativas':'#6A1537',
-    'Enfermedades infecto-contagiosas':'#1E7D35',
-    'Enfermedades perinatales y del embarazo':'#5A3080',
-    'Alimentación y nutrición':'#C8960C',
-    'Conducta':'#1A5A7A',
-    'Otra':'#888888', '':'#888888'
-  };
+  const W = 900, H = 560; // viewBox fijo, escala responsivo
+  const areas = ['Enfermedades crónico-degenerativas','Enfermedades infecto-contagiosas','Enfermedades perinatales y del embarazo','Alimentación y nutrición','Conducta'];
 
-  // Nodos de investigadores en círculo
-  const nodes = appData.researchers.map((r,i) => {
-    const a = (2*Math.PI*i/N)-Math.PI/2;
-    return {
-      id:r.id, name:r.name, short:r.name.split(' ').slice(0,2).join(' '),
-      x:cx+R*Math.cos(a), y:cy+R*Math.sin(a),
-      color:areaC[r.area]||'#6A1537', r:Math.max(16, Math.min(24, 26-N)),
-      area:r.area, unit:r.unit?nombreUnidad(r.unit):'', pubs:r.pubs||0
-    };
-  });
+  // Filtrar investigadores según el área seleccionada
+  const visibles = _networkFilter==='all'
+    ? appData.researchers
+    : appData.researchers.filter(r => (r.area||'Otra') === _networkFilter);
 
-  // Detectar coautorías entre miembros para dibujar enlaces reales
-  const internal = computeInternalCollaborations();
-  const nameToIdx = {}; nodes.forEach((n,i)=>nameToIdx[n.name]=i);
-
-  // Construir SVG
   let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:100%;" xmlns="http://www.w3.org/2000/svg">`;
-  // Grid sutil
   svg += `<defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(106,21,55,0.04)" stroke-width="1"/></pattern></defs>`;
   svg += `<rect width="${W}" height="${H}" fill="url(#grid)"/>`;
 
-  // Nodo central
-  svg += `<g><line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy}" /></g>`;
+  if(_networkFilter==='all'){
+    // ── Vista de clusters: un grupo por área ──
+    const cx=W/2, cy=H/2;
+    const areasConGente = areas.filter(a => appData.researchers.some(r => (r.area||'Otra')===a));
+    const nA = areasConGente.length;
+    const clusterR = Math.min(W,H)*0.33; // radio del anillo de clusters
+    // Centro de la red
+    svg += `<circle cx="${cx}" cy="${cy}" r="30" fill="#4E0E28" stroke="#fff" stroke-width="3"/>`;
+    svg += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="10">Red Salud</text>`;
+    svg += `<text x="${cx}" y="${cy+11}" text-anchor="middle" fill="#C8960C" font-family="Montserrat,Arial" font-weight="800" font-size="9">IPN</text>`;
 
-  // Enlaces investigador → centro
-  nodes.forEach(n => {
-    svg += `<line x1="${cx}" y1="${cy}" x2="${n.x}" y2="${n.y}" stroke="rgba(106,21,55,0.12)" stroke-width="1.5"/>`;
-  });
-  // Enlaces de coautoría (más gruesos según número de artículos compartidos)
-  internal.links.forEach(l => {
-    const ia=nameToIdx[l.a], ib=nameToIdx[l.b];
-    if(ia!=null && ib!=null){
-      svg += `<line x1="${nodes[ia].x}" y1="${nodes[ia].y}" x2="${nodes[ib].x}" y2="${nodes[ib].y}" stroke="rgba(200,150,12,0.55)" stroke-width="${Math.min(5,1.5+l.count)}"><title>${l.a.split(' ').slice(0,2).join(' ')} ↔ ${l.b.split(' ').slice(0,2).join(' ')}: ${l.count} artículo(s)</title></line>`;
-    }
-  });
-
-  // Centro
-  svg += `<circle cx="${cx}" cy="${cy}" r="34" fill="#4E0E28" stroke="#fff" stroke-width="3"/>`;
-  svg += `<text x="${cx}" y="${cy-6}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="10">Red</text>`;
-  svg += `<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="10">Salud</text>`;
-  svg += `<text x="${cx}" y="${cy+16}" text-anchor="middle" fill="#C8960C" font-family="Montserrat,Arial" font-weight="800" font-size="9">IPN</text>`;
-
-  // Nodos de investigadores (interactivos con <title> tooltip nativo)
-  nodes.forEach(n => {
-    svg += `<g style="cursor:pointer;" onclick="showResearcherDetail('${n.id}')">
-      <circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${n.color}" stroke="#fff" stroke-width="2.5">
-        <title>${n.name}\n${n.area}${n.unit?' · '+n.unit:''}\n${n.pubs} publicaciones</title>
-      </circle>
-      <text x="${n.x}" y="${n.y+n.r+12}" text-anchor="middle" fill="${n.color}" font-family="Montserrat,Arial" font-weight="700" font-size="9.5">${n.short}</text>
-    </g>`;
-  });
+    areasConGente.forEach((area, ai) => {
+      const ang = (2*Math.PI*ai/nA) - Math.PI/2;
+      const ccx = cx + clusterR*Math.cos(ang);
+      const ccy = cy + clusterR*Math.sin(ang);
+      const color = AREA_COLORS[area]||'#6A1537';
+      const gente = appData.researchers.filter(r => (r.area||'Otra')===area);
+      // Enlace centro → cluster
+      svg += `<line x1="${cx}" y1="${cy}" x2="${ccx}" y2="${ccy}" stroke="${color}" stroke-width="2" opacity="0.25"/>`;
+      // Nodos del cluster en pequeño círculo alrededor de su centro
+      const subR = Math.min(70, 22 + gente.length*1.3);
+      gente.forEach((r, gi) => {
+        const ga = (2*Math.PI*gi/gente.length);
+        const gx = ccx + subR*Math.cos(ga)*(gente.length>1?1:0);
+        const gy = ccy + subR*Math.sin(ga)*(gente.length>1?1:0);
+        svg += `<circle cx="${gx}" cy="${gy}" r="5.5" fill="${color}" stroke="#fff" stroke-width="1" opacity="0.85" style="cursor:pointer;" onclick="showResearcherDetail('${r.id}')"><title>${r.name}\n${nombreUnidad(r.unit||'')}\n${r.pubs||0} publicaciones</title></circle>`;
+      });
+      // Etiqueta del cluster
+      svg += `<rect x="${ccx-70}" y="${ccy-subR-26}" width="140" height="20" rx="10" fill="${color}"/>`;
+      svg += `<text x="${ccx}" y="${ccy-subR-12}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="700" font-size="10">${AREA_CORTA[area]||area} (${gente.length})</text>`;
+    });
+  } else {
+    // ── Vista de un área: nodos con nombre, distribuidos en rejilla circular ──
+    const color = AREA_COLORS[_networkFilter]||'#6A1537';
+    const cx=W/2, cy=H/2;
+    const n = visibles.length;
+    // Distribuir en anillos concéntricos para que quepan sin encimarse
+    const perRing = 18;
+    visibles.forEach((r, i) => {
+      const ring = Math.floor(i/perRing);
+      const idxInRing = i % perRing;
+      const countInRing = Math.min(perRing, n - ring*perRing);
+      const ringR = 70 + ring*70;
+      const a = (2*Math.PI*idxInRing/countInRing) - Math.PI/2;
+      const x = cx + ringR*Math.cos(a);
+      const y = cy + ringR*Math.sin(a);
+      svg += `<g style="cursor:pointer;" onclick="showResearcherDetail('${r.id}')">
+        <circle cx="${x}" cy="${y}" r="9" fill="${color}" stroke="#fff" stroke-width="1.5" opacity="0.9"><title>${r.name}\n${nombreUnidad(r.unit||'')}\n${r.pubs||0} publicaciones</title></circle>
+        <text x="${x}" y="${y+18}" text-anchor="middle" fill="${color}" font-family="Montserrat,Arial" font-weight="600" font-size="8">${r.name.split(' ').slice(0,2).join(' ')}</text>
+      </g>`;
+    });
+    // Etiqueta central
+    svg += `<circle cx="${cx}" cy="${cy}" r="34" fill="${color}" stroke="#fff" stroke-width="3"/>`;
+    svg += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="9">${AREA_CORTA[_networkFilter]||''}</text>`;
+    svg += `<text x="${cx}" y="${cy+11}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="11">${visibles.length}</text>`;
+  }
   svg += `</svg>`;
   container.innerHTML = svg;
 
-  // Actualizar leyenda dinámica por áreas presentes
+  // Leyenda
   const leyenda = document.getElementById('network-legend');
   if(leyenda){
-    const areasPresentes = [...new Set(appData.researchers.map(r=>r.area))];
-    leyenda.innerHTML = areasPresentes.map(a=>`<div class="legend-item"><div class="legend-dot" style="background:${areaC[a]||'#6A1537'};"></div>${a}</div>`).join('')
-      + `<div class="legend-item"><div style="width:18px;height:3px;background:rgba(200,150,12,0.7);"></div>Coautoría entre miembros</div>`;
+    const areasPresentes = areas.filter(a => appData.researchers.some(r=>(r.area||'Otra')===a));
+    leyenda.innerHTML = areasPresentes.map(a=>`<div class="legend-item"><div class="legend-dot" style="background:${AREA_COLORS[a]||'#6A1537'};"></div>${AREA_CORTA[a]||a}</div>`).join('');
   }
 }
 
@@ -3426,6 +3423,15 @@ async function importarPublicacionesORCID(researcherName, orcid, opts={}){
       if(r){ nuevas++; await loadPublications(); }
     }
   }
+  // Detectar colaboraciones externas (nacionales/internacionales) vía Crossref
+  if(!opts.skipCollabs && works.length){
+    try{
+      const detectadas = await detectarColaboracionesExternas(works);
+      const nNac = Object.keys(detectadas.nacionales).length;
+      const nInt = Object.keys(detectadas.internacionales).length;
+      if(nNac || nInt) await guardarColaboraciones(detectadas);
+    }catch(e){ console.warn('Crossref colabs:', e.message); }
+  }
   return {nuevas, coautorias, works};
 }
 
@@ -3647,48 +3653,145 @@ async function deleteEvent(){
   renderCalendar();
 }
 
-// Carga directorio_import.json y da de alta a los investigadores
-// que aún no existan (por nombre). No duplica.
-// ═══════════════════════════════════════════════════════════
-let _importando = false;
-async function importarDirectorio(){
-  if(!isAdmin || !db){ openLogin(); return; }
-  if(_importando){ notify('Ya hay una importación en curso…'); return; }
-  if(!confirm('¿Importar el directorio preliminar de investigadores? Se agregarán los que aún no existan en la Red.')) return;
-  _importando = true;
-  notify('🔄 Descargando directorio…');
-  let registros;
-  try{
-    const res = await fetch('directorio_import.json');
-    if(!res.ok) throw new Error('no encontrado');
-    registros = await res.json();
-  }catch(e){
-    notify('✕ No se encontró directorio_import.json en el servidor. Súbelo al repositorio junto al index.html.');
-    _importando = false; return;
+// ── Normalización de datos del Excel (replica la lógica del procesamiento inicial) ──
+function normSNII(v){
+  if(!v) return 'No aplica';
+  const s = String(v).trim();
+  const map = {'Nivel 1':'Nivel I','Nivel 2':'Nivel II','Nivel 3':'Nivel III','1':'Nivel I','2':'Nivel II','3':'Nivel III'};
+  return map[s] || s;
+}
+function siglaUnidad(v){
+  if(!v) return '';
+  const s = String(v);
+  let m = s.match(/\(([A-ZÁÉÍÓÚÑ]{2,8})\)/);        // sigla entre paréntesis
+  if(m) return m[1];
+  m = s.match(/[-–]\s*([A-ZÁÉÍÓÚÑ]{2,8})(?:[,\s]|$)/); // sigla tras guion
+  if(m) return m[1];
+  if(/CECyT/i.test(s)) return 'CECyT';
+  // Si ya es una sigla corta directa
+  if(/^[A-ZÁÉÍÓÚÑ]{2,8}$/.test(s.trim())) return s.trim().toUpperCase();
+  return s.substring(0,8).toUpperCase();
+}
+function mapearAreaRed(areasStr){
+  const t = String(areasStr||'').toLowerCase();
+  const scores = {
+    'Enfermedades crónico-degenerativas': (t.match(/cr[oó]nico|degenerat|c[aá]ncer|oncol|diabet|metaból|cardio/g)||[]).length,
+    'Enfermedades infecto-contagiosas': (t.match(/infeccios|diagn[oó]stico r[aá]pido|epidemiolog|genómic|vacun|microb|inmunoter/g)||[]).length,
+    'Enfermedades perinatales y del embarazo': (t.match(/materno|fetal|perinatal|embarazo|neonat/g)||[]).length,
+    'Alimentación y nutrición': (t.match(/nutrici|obesidad|aliment/g)||[]).length,
+    'Conducta': (t.match(/neuro|conduct|trastorno|salud mental|psic|neurodesarrollo/g)||[]).length
+  };
+  let best='Enfermedades crónico-degenerativas', max=0;
+  for(const [a,n] of Object.entries(scores)){ if(n>max){max=n;best=a;} }
+  return best;
+}
+// Busca el valor de una columna por varios posibles encabezados
+function col(row, ...nombres){
+  const keys = Object.keys(row);
+  for(const nom of nombres){
+    const k = keys.find(k => k.toLowerCase().trim() === nom.toLowerCase().trim());
+    if(k && row[k]!=null && String(row[k]).trim()!=='') return String(row[k]).trim();
   }
+  // Búsqueda parcial (contiene)
+  for(const nom of nombres){
+    const k = keys.find(k => k.toLowerCase().includes(nom.toLowerCase()));
+    if(k && row[k]!=null && String(row[k]).trim()!=='') return String(row[k]).trim();
+  }
+  return '';
+}
+
+// Convierte una fila del Excel en un registro de investigador
+function filaARegistro(row){
+  const nombre = col(row, 'Nombre', 'Nombre completo', 'Investigador');
+  if(!nombre) return null;
+  const areasExp = col(row, 'Área de expertiz', 'Area de expertiz', 'Áreas', 'Expertiz', 'Línea', 'Lineas');
+  const lines = areasExp ? areasExp.split(',').map(s=>s.trim()).filter(Boolean).slice(0,3) : [];
+  return {
+    name: nombre,
+    sni: normSNII(col(row, 'Nivel SNII', 'SNII', 'SNI', 'Nivel SNI')),
+    unit: siglaUnidad(col(row, 'Unidad académica', 'Unidad academica', 'Unidad')),
+    area: mapearAreaRed(areasExp),
+    lines,
+    orcid: extraerORCID(col(row, 'Red ORCID', 'ORCID', 'Orcid')),
+    email: col(row, 'Contacto', 'Correo', 'Email', 'Correo institucional'),
+    scopus: col(row, 'Scopus', 'Red Scopus', 'Liga Scopus'),
+    scholar: col(row, 'Scholar', 'Google Scholar', 'Liga Scholar')
+  };
+}
+
+let _importando = false;
+function handleXlsxDrop(e){
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if(f) handleXlsxFile([f]);
+}
+function handleXlsxFile(input){
+  if(!isAdmin || !db){ openLogin(); return; }
+  const file = Array.isArray(input) ? input[0] : (input.files && input.files[0]);
+  if(!file) return;
+  if(typeof XLSX === 'undefined'){ notify('✕ La librería de lectura no cargó. Revisa tu conexión y recarga.'); return; }
+  const area = document.getElementById('xlsx-result-area');
+  area.innerHTML = `<div class="cvu-warn" style="font-size:13px;">🔄 Leyendo ${file.name}…</div>`;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      if(!rows.length){ area.innerHTML = '<div class="cvu-err" style="font-size:13px;">✕ El archivo no tiene filas de datos.</div>'; return; }
+      const registros = rows.map(filaARegistro).filter(Boolean);
+      if(!registros.length){ area.innerHTML = '<div class="cvu-err" style="font-size:13px;">✕ No se encontró la columna "Nombre". Revisa los encabezados.</div>'; return; }
+      area.innerHTML = `<div class="cvu-warn" style="font-size:13px;">🔄 Procesando ${registros.length} investigadores…</div>`;
+      await importarRegistros(registros, area);
+    }catch(ex){
+      console.error(ex);
+      area.innerHTML = `<div class="cvu-err" style="font-size:13px;">✕ Error al leer el archivo: ${ex.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Upsert: actualiza los existentes por nombre, agrega los nuevos
+async function importarRegistros(registros, area){
+  if(_importando){ notify('Ya hay una importación en curso…'); return; }
+  _importando = true;
   await loadResearchers();
-  const existentes = new Set(appData.researchers.map(r => r.name.toLowerCase().trim()));
-  let nuevos=0, saltados=0, errores=0;
+  const porNombre = new Map(appData.researchers.map(r => [r.name.toLowerCase().trim(), r]));
+  let nuevos=0, actualizados=0, errores=0;
   for(let i=0;i<registros.length;i++){
     const r = registros[i];
-    if(existentes.has(r.name.toLowerCase().trim())){ saltados++; continue; }
     setSyncStatus('loading', `Importando ${i+1}/${registros.length}…`);
     const record = {
-      name: r.name, dept: r.area||'', unit: r.unit||'', inst: r.inst||'Instituto Politécnico Nacional',
+      name: r.name, dept: r.area||'', unit: r.unit||'',
       area: r.area||'', area_completa: (r.lines||[]).join(' · '),
       sni: r.sni||'No aplica', orcid: r.orcid||'', email: r.email||'',
-      lines: Array.isArray(r.lines)?r.lines:[], pubs: 0,
+      scopus: r.scopus||'', scholar: r.scholar||'',
+      lines: Array.isArray(r.lines)?r.lines:[],
       rizoma: 'https://rizoma.conacyt.mx/'
     };
-    const { error } = await db.from('researchers').insert(record);
-    if(error){ errores++; console.warn('Import error:', r.name, error.message); }
-    else { nuevos++; existentes.add(r.name.toLowerCase().trim()); }
-    if(i % 10 === 0) await new Promise(res=>setTimeout(res, 50));
+    const existente = porNombre.get(r.name.toLowerCase().trim());
+    if(existente && existente.id){
+      // Actualizar: preservar datos complementarios que el Excel no trae
+      if(!record.email && existente.email) record.email = existente.email;
+      if(existente.laboratorio) record.laboratorio = existente.laboratorio;
+      if(existente.ext) record.ext = existente.ext;
+      if(existente.ext_laboratorio) record.ext_laboratorio = existente.ext_laboratorio;
+      const { error } = await db.from('researchers').update(record).eq('id', existente.id);
+      if(error){ errores++; console.warn('Update error:', r.name, error.message); }
+      else actualizados++;
+    }else{
+      const { error } = await db.from('researchers').insert(record);
+      if(error){ errores++; console.warn('Insert error:', r.name, error.message); }
+      else nuevos++;
+    }
+    if(i % 10 === 0) await new Promise(res=>setTimeout(res, 40));
   }
   await loadResearchers();
   refreshActiveView();
   setSyncStatus('connected', 'Sincronizado');
-  notify(`✓ Importación completa: ${nuevos} nuevos · ${saltados} ya existían${errores?` · ${errores} errores`:''}`);
+  const msg = `✓ Importación completa: ${nuevos} nuevos · ${actualizados} actualizados${errores?` · ${errores} errores`:''}`;
+  if(area) area.innerHTML = `<div class="cvu-ok" style="font-size:13px;">${msg}</div>`;
+  notify(msg);
   _importando = false;
 }
 
