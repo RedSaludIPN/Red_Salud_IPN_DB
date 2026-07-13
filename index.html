@@ -437,6 +437,16 @@ body {
 }
 .pl-link:hover { background: var(--guinda); color: #fff; }
 
+/* Gráfica de pastel SNII */
+.snii-pie-wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.snii-legend { display: flex; flex-direction: column; gap: 6px; min-width: 130px; }
+.snii-legend-item { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text2); }
+.snii-legend-dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+.snii-legend-count { margin-left: auto; font-family: var(--font-head); font-weight: 700; color: var(--guinda); font-size: 12px; }
+.snii-slice { transition: opacity 0.15s; cursor: pointer; }
+.snii-slice:hover { opacity: 0.78; }
+@media (max-width: 640px) { .snii-pie-wrap { flex-direction: column; } }   
+
 /* Calendario */
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .cal-dow { text-align: center; font-family: var(--font-head); font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; padding: 4px 0; letter-spacing: 0.5px; }
@@ -1110,9 +1120,17 @@ body {
           <div class="metric-sub">o no clasificadas</div>
         </div>
       </div>
-
+       
       <!-- GRÁFICAS -->
-      <div class="charts-row">
+       <!-- Gráfica de pastel: Nivel de SNII -->
+        <div class="chart-card">
+          <div class="chart-title">Distriobución por Nivel de SNII</div>
+          <div id="snii-pie-chart">
+             <div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin investigadores registrados.</div></div>
+          </div>
+        </div>
+       
+       <div class="charts-row">
         <!-- Distribución por cuartil -->
         <div class="chart-card">
           <div class="chart-title">Distribución por cuartil · este año</div>
@@ -2260,7 +2278,102 @@ function renderDashboard() {
   renderMetrics();
 }
 
+// ═══════════════════════════════════════════════════════════
+// GRÁFICA DE PASTEL — Distribución por Nivel SNII
+// ═══════════════════════════════════════════════════════════
+const SNII_ORDEN = ['Nivel III','Nivel II','Nivel I','Candidato','Emérito','No aplica'];
+const SNII_COLORES = {
+  'Nivel III': '#4E0E28',
+  'Nivel II':  '#6A1537',
+  'Nivel I':   '#8B1A45',
+  'Candidato': '#C8960C',
+  'Emérito':   '#1E7D35',
+  'No aplica': '#B0A9A0'
+};
+
+function renderSNIIPie(){
+  const wrap = document.getElementById('snii-pie-chart');
+  if(!wrap) return;
+
+  // Contar investigadores por nivel
+  const counts = {};
+  appData.researchers.forEach(r => {
+    const nivel = (r.sni && String(r.sni).trim()) || 'No aplica';
+    counts[nivel] = (counts[nivel] || 0) + 1;
+  });
+
+  const datos = SNII_ORDEN
+    .filter(n => counts[n] > 0)
+    .map(n => ({ nivel: n, n: counts[n], color: SNII_COLORES[n] || '#888' }));
+  // Incluir cualquier nivel no contemplado en el orden estándar
+  Object.keys(counts).forEach(n => {
+    if(!SNII_ORDEN.includes(n)) datos.push({ nivel: n, n: counts[n], color: '#888' });
+  });
+
+  const total = datos.reduce((s,d) => s + d.n, 0);
+  if(!total){
+    wrap.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin investigadores registrados.</div></div>';
+    return;
+  }
+
+  // Construir el pastel (dona) con arcos SVG
+  const CX = 80, CY = 80, R = 68, RI = 38; // radio externo e interno
+  let anguloAcum = -Math.PI / 2; // empezar arriba
+  const slices = datos.map(d => {
+    const frac = d.n / total;
+    const angulo = frac * 2 * Math.PI;
+    const a0 = anguloAcum;
+    const a1 = anguloAcum + angulo;
+    anguloAcum = a1;
+
+    // Caso especial: un solo nivel ocupa el 100% → dibujar anillo completo
+    if(datos.length === 1){
+      return `<circle cx="${CX}" cy="${CY}" r="${(R+RI)/2}" fill="none" stroke="${d.color}" stroke-width="${R-RI}">
+        <title>${d.nivel}: ${d.n} (100%)</title>
+      </circle>`;
+    }
+
+    const x0 = CX + R * Math.cos(a0),  y0 = CY + R * Math.sin(a0);
+    const x1 = CX + R * Math.cos(a1),  y1 = CY + R * Math.sin(a1);
+    const xi1 = CX + RI * Math.cos(a1), yi1 = CY + RI * Math.sin(a1);
+    const xi0 = CX + RI * Math.cos(a0), yi0 = CY + RI * Math.sin(a0);
+    const largeArc = angulo > Math.PI ? 1 : 0;
+    const pct = Math.round(frac * 100);
+
+    const path = M ${x0} ${y0} A ${R} ${R} 0 ${largeArc} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${RI} ${RI} 0 ${largeArc} 0 ${xi0} ${yi0} Z;
+    return `<path class="snii-slice" d="${path}" fill="${d.color}" stroke="#fff" stroke-width="1.5">
+      <title>${d.nivel}: ${d.n} investigador${d.n!==1?'es':''} (${pct}%)</title>
+    </path>`;
+  }).join('');
+
+  // Con SNII = todos menos "No aplica"
+  const conSNII = datos.filter(d => d.nivel !== 'No aplica').reduce((s,d) => s + d.n, 0);
+
+  wrap.innerHTML = `
+    <div class="snii-pie-wrap">
+      <svg viewBox="0 0 160 160" style="width:160px;height:160px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg">
+        ${slices}
+        <text x="${CX}" y="${CY-4}" text-anchor="middle" font-family="Montserrat,Arial" font-size="20" font-weight="800" fill="var(--guinda)">${total}</text>
+        <text x="${CX}" y="${CY+10}" text-anchor="middle" font-family="Montserrat,Arial" font-size="8" font-weight="600" fill="var(--text3)">INVESTIGADORES</text>
+      </svg>
+      <div class="snii-legend">
+        ${datos.map(d => {
+          const pct = Math.round((d.n/total)*100);
+          return `<div class="snii-legend-item">
+            <span class="snii-legend-dot" style="background:${d.color};"></span>
+            <span>${d.nivel}</span>
+            <span class="snii-legend-count">${d.n} · ${pct}%</span>
+          </div>`;
+        }).join('')}
+        <div style="border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-size:11px;color:var(--text3);">
+          Con SNII: <strong style="color:var(--guinda);">${conSNII}</strong> de ${total}
+        </div>
+      </div>
+    </div>`;
+}
+   
 function renderMetrics() {
+  renderSNIIPie();
   const currentYear = new Date().getFullYear();
   document.getElementById('metrics-year-badge').textContent = currentYear;
 
