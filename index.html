@@ -1257,21 +1257,29 @@ body {
     <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Vinculaciones y alianzas</div><div class="sh-title">Colaboraciones</div></div></div>
     <div class="card mt-16" style="margin-bottom:20px;">
       <div class="card-body">
-        <div id="map-container"><svg id="world-map" style="width:100%;height:100%;" viewBox="0 0 900 450"></svg></div>
+        <div id="map-container"><svg id="world-map" style="width:100%;height:100%;" viewBox="0 0 900 500"></svg></div>
         <div class="map-legend mt-16">
-          <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);width:12px;height:12px;"></div>Sede IPN</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#1E7D35;"></div>Colaborador nacional</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--gold);"></div>Colaborador internacional</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);width:12px;height:12px;"></div>Red de Salud IPN</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1E7D35;"></div>Nacional</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--gold);"></div>Internacional</div>
         </div>
+        <p style="font-size:11.5px;color:var(--text3);margin-top:7px;">El tamaño de cada nodo refleja el número de colaboraciones. Pasa el cursor para ver los detalles, o arrastra para explorar.</p>
       </div>
     </div>
+
     <div class="card" style="margin-bottom:20px;">
-      <div class="card-header"><h3>🔗 Colaboraciones Internas de la Red</h3><span style="font-size:10.5px;color:var(--text3);font-family:var(--font-body);">Detectadas automáticamente por coautorías</span></div>
-      <div class="card-body" id="internal-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se calculan automáticamente cuando dos miembros comparten un artículo.</div></div></div>
+      <div class="card-header"><h3>🏛️ Colaboraciones entre Unidades Académicas</h3><span style="font-size:10.5px;color:var(--text3);font-family:var(--font-body);">Coautorías entre unidades del IPN</span></div>
+      <div class="card-body" id="unit-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se calculan automáticamente cuando investigadores de distintas unidades comparten un artículo.</div></div></div>
     </div>
+
     <div class="grid-2">
-      <div class="card"><div class="card-header"><h3>🇲🇽 Colaboraciones Nacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · Crossref</span></div><div class="card-body" id="national-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores al cargar CVUs.</div></div></div></div>
-      <div class="card"><div class="card-header"><h3>🌍 Colaboraciones Internacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · Crossref</span></div><div class="card-body" id="international-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores al cargar CVUs.</div></div></div></div>
+      <div class="card"><div class="card-header"><h3>🇲🇽 Colaboraciones Nacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · Crossref</span></div><div class="card-body" id="national-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores.</div></div></div></div>
+      <div class="card"><div class="card-header"><h3>🌍 Colaboraciones Internacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · Crossref</span></div><div class="card-body" id="international-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores.</div></div></div></div>
+    </div>
+
+    <div class="card mt-20" id="unclassified-card" style="display:none;">
+      <div class="card-header"><h3>❓ Por clasificar</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Instituciones sin país identificado</span></div>
+      <div class="card-body" id="unclassified-collabs"></div>
     </div>
   </section>
 
@@ -1848,7 +1856,11 @@ async function loadProjects() {
 }
 
 async function loadPublications() {
-  const { data, error } = await db.from('publications').select('*').order('year', { ascending: false });
+  // Traer solo las columnas necesarias y limitar el volumen (reduce el egress)
+  const { data, error } = await db.from('publications')
+    .select('id,title,type,year,authors,journal,doi,impact_factor,quartile,issn,url,pdf_url,network_authors')
+    .order('year', { ascending: false })
+    .limit(3000);
   if (error) { console.error('loadPublications:', error); return; }
   appData.publications = (data||[]).map(p => ({
     ...p,
@@ -2261,9 +2273,8 @@ function renderDashboard() {
   const totalCollabs = (appData.collaborations.national?.length||0) + (appData.collaborations.international?.length||0);
   const sCollabs = document.getElementById('s-collabs');
   if(sCollabs) sCollabs.textContent = totalCollabs;
-  const internal = computeInternalCollaborations();
   const sInternal = document.getElementById('s-internal');
-  if(sInternal) sInternal.textContent = internal.links.length;
+  if(sInternal) sInternal.textContent = computeUnitCollaborations().length;
 
   const dp = document.getElementById('dash-projects');
   dp.innerHTML = appData.projects.length ? appData.projects.slice(0,4).map(p=>`
@@ -2767,19 +2778,32 @@ function renderNetwork() {
     : appData.researchers.filter(r => (r.area||'Otra') === _networkFilter);
 
   let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:100%;" xmlns="http://www.w3.org/2000/svg">`;
-  svg += `<defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(106,21,55,0.04)" stroke-width="1"/></pattern></defs>`;
+  svg += `<defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(106,21,55,0.04)" stroke-width="1"/></pattern>
+    <radialGradient id="netCenter" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#8B1A45"/><stop offset="100%" stop-color="#4E0E28"/></radialGradient>
+  </defs>`;
   svg += `<rect width="${W}" height="${H}" fill="url(#grid)"/>`;
+
+  // Tamaño de nodo proporcional a publicaciones (estilo ResearchRabbit)
+  const maxPubs = Math.max(...appData.researchers.map(r=>r.pubs||0), 1);
+  const nodoR = (pubs, base) => base + Math.sqrt((pubs||0)/maxPubs) * base * 0.9;
 
   if(_networkFilter==='all'){
     // ── Vista de clusters: un grupo por área ──
     const cx=W/2, cy=H/2;
     const areasConGente = areas.filter(a => appData.researchers.some(r => (r.area||'Otra')===a));
     const nA = areasConGente.length;
-    const clusterR = Math.min(W,H)*0.33; // radio del anillo de clusters
-    // Centro de la red
-    svg += `<circle cx="${cx}" cy="${cy}" r="30" fill="#4E0E28" stroke="#fff" stroke-width="3"/>`;
-    svg += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="10">Red Salud</text>`;
-    svg += `<text x="${cx}" y="${cy+11}" text-anchor="middle" fill="#C8960C" font-family="Montserrat,Arial" font-weight="800" font-size="9">IPN</text>`;
+    const clusterR = Math.min(W,H)*0.33;
+
+    // Primero los enlaces curvos centro → cada nodo (para que queden detrás)
+    areasConGente.forEach((area, ai) => {
+      const ang = (2*Math.PI*ai/nA) - Math.PI/2;
+      const ccx = cx + clusterR*Math.cos(ang);
+      const ccy = cy + clusterR*Math.sin(ang);
+      const color = AREA_COLORS[area]||'#6A1537';
+      const mx=(cx+ccx)/2+(ccy-cy)*0.12, my=(cy+ccy)/2-(ccx-cx)*0.12;
+      svg += `<path d="M ${cx} ${cy} Q ${mx} ${my} ${ccx} ${ccy}" fill="none" stroke="${color}" stroke-width="2.5" opacity="0.28"/>`;
+    });
 
     areasConGente.forEach((area, ai) => {
       const ang = (2*Math.PI*ai/nA) - Math.PI/2;
@@ -2787,44 +2811,55 @@ function renderNetwork() {
       const ccy = cy + clusterR*Math.sin(ang);
       const color = AREA_COLORS[area]||'#6A1537';
       const gente = appData.researchers.filter(r => (r.area||'Otra')===area);
-      // Enlace centro → cluster
-      svg += `<line x1="${cx}" y1="${cy}" x2="${ccx}" y2="${ccy}" stroke="${color}" stroke-width="2" opacity="0.25"/>`;
-      // Nodos del cluster en pequeño círculo alrededor de su centro
-      const subR = Math.min(70, 22 + gente.length*1.3);
+      const subR = Math.min(72, 24 + gente.length*1.2);
       gente.forEach((r, gi) => {
-        const ga = (2*Math.PI*gi/gente.length);
-        const gx = ccx + subR*Math.cos(ga)*(gente.length>1?1:0);
-        const gy = ccy + subR*Math.sin(ga)*(gente.length>1?1:0);
-        svg += `<circle cx="${gx}" cy="${gy}" r="5.5" fill="${color}" stroke="#fff" stroke-width="1" opacity="0.85" style="cursor:pointer;" onclick="showResearcherDetail('${r.id}')"><title>${r.name}\n${nombreUnidad(r.unit||'')}\n${r.pubs||0} publicaciones</title></circle>`;
+        const ga = (2*Math.PI*gi/gente.length) + (gi%2?0.15:-0.15);
+        const rr = subR + (gi%3-1)*8; // variación orgánica
+        const gx = ccx + rr*Math.cos(ga)*(gente.length>1?1:0);
+        const gy = ccy + rr*Math.sin(ga)*(gente.length>1?1:0);
+        const nr = nodoR(r.pubs, 4.5);
+        svg += `<circle cx="${gx}" cy="${gy}" r="${nr}" fill="${color}" stroke="#fff" stroke-width="1" opacity="0.85" style="cursor:pointer;" onclick="showResearcherDetail('${r.id}')"><title>${r.name}\n${nombreUnidad(r.unit||'')}\n${r.pubs||0} publicaciones</title></circle>`;
       });
-      // Etiqueta del cluster
       svg += `<rect x="${ccx-70}" y="${ccy-subR-26}" width="140" height="20" rx="10" fill="${color}"/>`;
       svg += `<text x="${ccx}" y="${ccy-subR-12}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="700" font-size="10">${AREA_CORTA[area]||area} (${gente.length})</text>`;
     });
+    // Centro
+    svg += `<circle cx="${cx}" cy="${cy}" r="32" fill="url(#netCenter)" stroke="#C8960C" stroke-width="3"/>`;
+    svg += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="10">Red Salud</text>`;
+    svg += `<text x="${cx}" y="${cy+11}" text-anchor="middle" fill="#C8960C" font-family="Montserrat,Arial" font-weight="800" font-size="9">IPN</text>`;
   } else {
-    // ── Vista de un área: nodos con nombre, distribuidos en rejilla circular ──
+    // ── Vista de un área: nodos con nombre, tamaño ∝ publicaciones ──
     const color = AREA_COLORS[_networkFilter]||'#6A1537';
     const cx=W/2, cy=H/2;
     const n = visibles.length;
-    // Distribuir en anillos concéntricos para que quepan sin encimarse
     const perRing = 18;
+    // Enlaces curvos centro → nodo primero
     visibles.forEach((r, i) => {
       const ring = Math.floor(i/perRing);
       const idxInRing = i % perRing;
       const countInRing = Math.min(perRing, n - ring*perRing);
-      const ringR = 70 + ring*70;
+      const ringR = 78 + ring*72;
       const a = (2*Math.PI*idxInRing/countInRing) - Math.PI/2;
-      const x = cx + ringR*Math.cos(a);
-      const y = cy + ringR*Math.sin(a);
+      const x = cx + ringR*Math.cos(a), y = cy + ringR*Math.sin(a);
+      const mx=(cx+x)/2+(y-cy)*0.1, my=(cy+y)/2-(x-cx)*0.1;
+      svg += `<path d="M ${cx} ${cy} Q ${mx} ${my} ${x} ${y}" fill="none" stroke="${color}" stroke-width="1" opacity="0.18"/>`;
+    });
+    visibles.forEach((r, i) => {
+      const ring = Math.floor(i/perRing);
+      const idxInRing = i % perRing;
+      const countInRing = Math.min(perRing, n - ring*perRing);
+      const ringR = 78 + ring*72;
+      const a = (2*Math.PI*idxInRing/countInRing) - Math.PI/2;
+      const x = cx + ringR*Math.cos(a), y = cy + ringR*Math.sin(a);
+      const nr = nodoR(r.pubs, 7);
       svg += `<g style="cursor:pointer;" onclick="showResearcherDetail('${r.id}')">
-        <circle cx="${x}" cy="${y}" r="9" fill="${color}" stroke="#fff" stroke-width="1.5" opacity="0.9"><title>${r.name}\n${nombreUnidad(r.unit||'')}\n${r.pubs||0} publicaciones</title></circle>
-        <text x="${x}" y="${y+18}" text-anchor="middle" fill="${color}" font-family="Montserrat,Arial" font-weight="600" font-size="8">${r.name.split(' ').slice(0,2).join(' ')}</text>
+        <circle cx="${x}" cy="${y}" r="${nr}" fill="${color}" stroke="#fff" stroke-width="1.5" opacity="0.9"><title>${r.name}\n${nombreUnidad(r.unit||'')}\n${r.pubs||0} publicaciones</title></circle>
+        <text x="${x}" y="${y+nr+10}" text-anchor="middle" fill="${color}" font-family="Montserrat,Arial" font-weight="600" font-size="8">${r.name.split(' ').slice(0,2).join(' ')}</text>
       </g>`;
     });
-    // Etiqueta central
-    svg += `<circle cx="${cx}" cy="${cy}" r="34" fill="${color}" stroke="#fff" stroke-width="3"/>`;
-    svg += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="9">${AREA_CORTA[_networkFilter]||''}</text>`;
-    svg += `<text x="${cx}" y="${cy+11}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="11">${visibles.length}</text>`;
+    svg += `<circle cx="${cx}" cy="${cy}" r="34" fill="url(#netCenter)" stroke="#C8960C" stroke-width="3"/>`;
+    svg += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="8">${AREA_CORTA[_networkFilter]||''}</text>`;
+    svg += `<text x="${cx}" y="${cy+11}" text-anchor="middle" fill="#C8960C" font-family="Montserrat,Arial" font-weight="800" font-size="12">${visibles.length}</text>`;
   }
   svg += `</svg>`;
   container.innerHTML = svg;
@@ -2961,10 +2996,10 @@ async function detectarColaboracionesExternas(works, onProgress){
 }
 
 // Guarda/actualiza colaboraciones externas en Supabase
-async function guardarColaboraciones(detectadas){
+async function guardarColaboraciones(detectadas, opts={}){
   if(!db || !isAdmin) return;
-  // Cargar colaboraciones existentes para no duplicar
-  await loadCollaborations();
+  // Solo recargar si el llamador no lo hizo ya (evita descargas repetidas = egress)
+  if(!opts.skipReload) await loadCollaborations();
   const existentesNac = new Map(appData.collaborations.national.map(c=>[c.inst.toLowerCase(), c]));
   const existentesInt = new Map(appData.collaborations.international.map(c=>[c.inst.toLowerCase(), c]));
 
@@ -2973,9 +3008,14 @@ async function guardarColaboraciones(detectadas){
     const key = inst.toLowerCase();
     if(existentesNac.has(key)){
       const c = existentesNac.get(key);
-      await db.from('collaborations').update({ projects_count: (c.projects_count||0) + count }).eq('id', c.id);
+      const nuevoTotal = (c.projects_count||0) + count;
+      await db.from('collaborations').update({ projects_count: nuevoTotal }).eq('id', c.id);
+      c.projects_count = nuevoTotal; // reflejar en memoria
     } else {
-      await db.from('collaborations').insert({ inst, city:'', country:'México', type:'national', projects_count: count });
+      const nueva = { inst, city:'', country:'México', type:'national', projects_count: count };
+      await db.from('collaborations').insert(nueva);
+      appData.collaborations.national.push(nueva);       // en memoria
+      existentesNac.set(key, nueva);
     }
   }
   // Internacionales
@@ -2983,9 +3023,14 @@ async function guardarColaboraciones(detectadas){
     const key = inst.toLowerCase();
     if(existentesInt.has(key)){
       const c = existentesInt.get(key);
-      await db.from('collaborations').update({ projects_count: (c.projects_count||0) + info.count }).eq('id', c.id);
+      const nuevoTotal = (c.projects_count||0) + info.count;
+      await db.from('collaborations').update({ projects_count: nuevoTotal }).eq('id', c.id);
+      c.projects_count = nuevoTotal;
     } else {
-      await db.from('collaborations').insert({ inst, city:'', country:info.pais, type:'international', projects_count: info.count });
+      const nueva = { inst, city:'', country:info.pais, type:'international', projects_count: info.count };
+      await db.from('collaborations').insert(nueva);
+      appData.collaborations.international.push(nueva);  // en memoria
+      existentesInt.set(key, nueva);
     }
   }
 }
@@ -3016,61 +3061,135 @@ function computeInternalCollaborations(){
   return { links, memberPubs };
 }
 
+// Colaboraciones entre unidades académicas del IPN (coautorías inter-unidad)
+function computeUnitCollaborations(){
+  // Mapa nombre → unidad
+  const unidadDe = {};
+  appData.researchers.forEach(r => { if(r.unit) unidadDe[r.name] = r.unit; });
+  const pares = {}; // "ESM||ENCB" → count
+  (appData.publications||[]).forEach(p => {
+    const autores = Array.isArray(p.network_authors) ? p.network_authors : [];
+    // Unidades distintas presentes en este artículo
+    const unidades = [...new Set(autores.map(a => unidadDe[a]).filter(Boolean))];
+    for(let i=0;i<unidades.length;i++){
+      for(let j=i+1;j<unidades.length;j++){
+        const key = [unidades[i], unidades[j]].sort().join('||');
+        pares[key] = (pares[key]||0) + 1;
+      }
+    }
+  });
+  return Object.entries(pares).map(([k,count]) => {
+    const [a,b] = k.split('||');
+    return { a, b, count };
+  }).sort((x,y) => y.count - x.count);
+}
+
+// Grafo estilo ResearchRabbit: nodo central + nodos institución con tamaño ∝ colaboraciones
+function renderCollabGraph(svg, nat, intl){
+  const W=900, H=500, cx=W/2, cy=H/2;
+  // Preparar nodos (excluir país "No especificado")
+  const nodos = [];
+  nat.forEach(c => nodos.push({label:c.inst, sub:c.city||'México', n:c.projects_count||c.projects||0, type:'nat'}));
+  intl.forEach(c => nodos.push({label:c.inst, sub:c.country||c.pais||'', n:c.projects_count||c.projects||0, type:'intl'}));
+
+  if(!nodos.length){
+    svg.innerHTML = `<rect width="${W}" height="${H}" fill="#FAF7F2"/><text x="${cx}" y="${cy}" text-anchor="middle" font-size="14" fill="#999" font-family="Arial">Sin colaboraciones registradas aún</text>`;
+    return;
+  }
+
+  const col = {main:'#6A1537', nat:'#1E7D35', intl:'#C8960C'};
+  const maxN = Math.max(...nodos.map(n=>n.n), 1);
+  // Radio del nodo proporcional al número de colaboraciones (estilo ResearchRabbit)
+  const nodeR = n => 8 + Math.sqrt(n/maxN) * 20;
+
+  // Disposición: distribuir en anillo, con leve variación radial para aspecto orgánico
+  const N = nodos.length;
+  const baseRing = Math.min(W,H)*0.34;
+  nodos.forEach((nd, i) => {
+    const ang = (2*Math.PI*i/N) - Math.PI/2 + (i%2?0.12:-0.12);
+    const rr = baseRing + (i%3-1)*28; // variación para que no queden en círculo perfecto
+    nd.x = cx + rr*Math.cos(ang);
+    nd.y = cy + rr*Math.sin(ang);
+  });
+
+  let s = `<rect width="${W}" height="${H}" fill="#FAF7F2"/>`;
+  s += `<defs>
+    <radialGradient id="glowCenter" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8B1A45"/><stop offset="100%" stop-color="#4E0E28"/>
+    </radialGradient>
+  </defs>`;
+  // Enlaces curvos centro → nodo (grosor ∝ colaboraciones)
+  nodos.forEach(nd => {
+    const mx = (cx+nd.x)/2 + (nd.y-cy)*0.08;
+    const my = (cy+nd.y)/2 - (nd.x-cx)*0.08;
+    const w = 1 + Math.sqrt(nd.n/maxN)*3;
+    s += `<path d="M ${cx} ${cy} Q ${mx} ${my} ${nd.x} ${nd.y}" fill="none" stroke="${col[nd.type]}" stroke-width="${w}" opacity="0.35"/>`;
+  });
+  // Nodos institución
+  nodos.forEach(nd => {
+    const r = nodeR(nd.n);
+    const corto = nd.label.length>22 ? nd.label.substring(0,22)+'…' : nd.label;
+    s += `<g style="cursor:pointer;">
+      <circle cx="${nd.x}" cy="${nd.y}" r="${r}" fill="${col[nd.type]}" stroke="#fff" stroke-width="2" opacity="0.92">
+        <title>${nd.label}\n${nd.sub}${nd.n?` · ${nd.n} colaboración(es)`:''}</title>
+      </circle>
+      <text x="${nd.x}" y="${nd.y+r+11}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${col[nd.type]}" font-family="Montserrat,Arial">${corto}</text>
+    </g>`;
+  });
+  // Nodo central (Red de Salud IPN) — el más grande
+  s += `<circle cx="${cx}" cy="${cy}" r="34" fill="url(#glowCenter)" stroke="#C8960C" stroke-width="3"/>`;
+  s += `<text x="${cx}" y="${cy-4}" text-anchor="middle" fill="#fff" font-family="Montserrat,Arial" font-weight="800" font-size="10">Red Salud</text>`;
+  s += `<text x="${cx}" y="${cy+9}" text-anchor="middle" fill="#C8960C" font-family="Montserrat,Arial" font-weight="800" font-size="10">IPN</text>`;
+  s += `<text x="14" y="${H-12}" font-size="9" fill="rgba(106,21,55,0.35)" font-family="Montserrat,Arial" letter-spacing="1">RED DE SALUD IPN · REI06-RSAL · El tamaño del nodo refleja el número de colaboraciones</text>`;
+  svg.innerHTML = s;
+}
+
 function renderCollaborations() {
   const svg = document.getElementById('world-map');
-  const internal = computeInternalCollaborations();
-  const hasInternal = internal.links.length > 0;
-  const hasExternal = appData.collaborations.national.length || appData.collaborations.international.length;
 
-  if (!hasInternal && !hasExternal) {
-    svg.innerHTML = `<rect width="900" height="450" fill="#F7F7F7"/><text x="450" y="225" text-anchor="middle" font-size="14" fill="#888" font-family="Arial">Sin colaboraciones registradas aún</text>`;
-  } else {
-    const nat = appData.collaborations.national;
-    const intl = appData.collaborations.international;
-    // Distribuir nacionales a la izquierda, internacionales a la derecha
-    const points = [
-      {x:175,y:225,type:'main',label:'Red Salud IPN',sub:'Sede',r:15,count:''},
-      ...nat.slice(0,8).map((c,i)=>{
-        const ang = (Math.PI/2) + (i/(Math.min(nat.length,8)))*(Math.PI*0.9);
-        return {x:175+130*Math.cos(ang+Math.PI), y:225+150*Math.sin(ang)-((i%2)*20), type:'nat',
-                label:(c.inst||''), sub:c.country||'México', r:8, count:c.projects_count||c.projects||0};
-      }),
-      ...intl.slice(0,8).map((c,i)=>({x:430+((i%4)*110), y:130+Math.floor(i/4)*150+(i%2)*30, type:'intl',
-                label:(c.inst||''), sub:c.country||c.pais||'Internacional', r:8, count:c.projects_count||c.projects||0}))
-    ];
-    const col={main:'#6A1537',nat:'#1E7D35',intl:'#C8960C'};
-    svg.innerHTML=`<rect width="900" height="450" fill="#F3EDE3"/>
-      ${Array.from({length:23},(_,i)=>`<line x1="${i*40}" y1="0" x2="${i*40}" y2="450" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
-      ${Array.from({length:12},(_,i)=>`<line x1="0" y1="${i*40}" x2="900" y2="${i*40}" stroke="rgba(106,21,55,0.04)" stroke-width="1"/>`).join('')}
-      <ellipse cx="450" cy="225" rx="400" ry="180" fill="rgba(106,21,55,0.04)" stroke="rgba(106,21,55,0.08)" stroke-width="1"/>
-      ${points.slice(1).map(p=>`<line x1="175" y1="225" x2="${p.x}" y2="${p.y}" stroke="${col[p.type]}" stroke-width="1.2" stroke-dasharray="${p.type==='intl'?'5,3':'none'}" opacity="0.4"/>`).join('')}
-      ${points.map(p=>{
-        const tooltip = p.type==='main' ? 'Red de Salud IPN · Sede' : `${p.label}\n${p.sub}${p.count?` · ${p.count} artículo(s)`:''}`;
-        return `<g style="cursor:pointer;">
-          <circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="${col[p.type]}" opacity="0.9" stroke="white" stroke-width="1.5">
-            <title>${tooltip}</title>
-          </circle>
-          ${p.r>10?`<text x="${p.x}" y="${p.y+p.r+13}" text-anchor="middle" font-size="9" font-weight="700" fill="${col[p.type]}" font-family="Montserrat,Arial">${p.label.substring(0,18)}</text>`
-                  :`<text x="${p.x}" y="${p.y-p.r-5}" text-anchor="middle" font-size="8" fill="${col[p.type]}" font-family="Montserrat,Arial">${p.label.substring(0,16)}${p.label.length>16?'…':''}</text>`}
-        </g>`;
-      }).join('')}
-      <text x="14" y="438" font-size="9" fill="rgba(106,21,55,0.35)" font-family="Montserrat,Arial" letter-spacing="1">RED DE SALUD IPN · REI06-RSAL · Pasa el cursor sobre cada nodo para ver detalles</text>`;
+  // Separar colaboraciones con país válido de las "por clasificar" (sin país)
+  const sinPais = c => { const p=(c.country||c.pais||'').trim().toLowerCase(); return !p || p==='no especificado' || p==='—'; };
+
+  const natTodas = appData.collaborations.national || [];
+  const intlTodas = appData.collaborations.international || [];
+  // Nacionales: todas tienen país México implícito, se muestran completas
+  const nat = [...natTodas].sort((a,b)=>(a.inst||'').localeCompare(b.inst||'','es'));
+  // Internacionales: separar las que tienen país de las que no
+  const intlConPais = intlTodas.filter(c=>!sinPais(c)).sort((a,b)=>(a.inst||'').localeCompare(b.inst||'','es'));
+  const porClasificar = intlTodas.filter(sinPais).sort((a,b)=>(a.inst||'').localeCompare(b.inst||'','es'));
+
+  // ── Grafo estilo ResearchRabbit (solo con país válido) ──
+  renderCollabGraph(svg, nat, intlConPais);
+
+  // ── Colaboraciones entre unidades académicas ──
+  const unitWrap = document.getElementById('unit-collabs');
+  if(unitWrap){
+    const unidades = computeUnitCollaborations();
+    unitWrap.innerHTML = unidades.length
+      ? unidades.slice(0,20).map(u=>`<div class="info-row"><span class="ir-label" style="min-width:auto;flex:1;">${nombreUnidad(u.a)} <span style="color:var(--gold);">↔</span> ${nombreUnidad(u.b)}</span><span class="ir-value" style="font-size:12.5px;font-weight:700;color:var(--guinda);white-space:nowrap;">${u.count} art.</span></div>`).join('')
+      : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Aún no hay coautorías entre distintas unidades. Se detectan cuando investigadores de unidades diferentes comparten un artículo.</div></div>';
   }
 
-  // ── Colaboraciones internas (coautorías entre miembros) ──
-  const intWrap = document.getElementById('internal-collabs');
-  if(intWrap){
-    intWrap.innerHTML = internal.links.length
-      ? internal.links.slice(0,15).map(l=>`<div class="info-row"><span class="ir-label" style="min-width:auto;flex:1;">${l.a.split(' ').slice(0,2).join(' ')} ↔ ${l.b.split(' ').slice(0,2).join(' ')}</span><span class="ir-value" style="font-size:12.5px;font-weight:700;color:var(--guinda);">${l.count} art.</span></div>`).join('')
-      : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Aún no hay coautorías entre miembros de la red. Se detectan automáticamente cuando dos investigadores comparten un artículo.</div></div>';
-  }
-
-  document.getElementById('national-collabs').innerHTML = appData.collaborations.national.length
-    ? appData.collaborations.national.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.city||'México'} · ${c.projects_count||c.projects||0} proyectos</span></div>`).join('')
+  // ── Listas nacionales / internacionales (orden alfabético) ──
+  document.getElementById('national-collabs').innerHTML = nat.length
+    ? nat.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.city||'México'} · ${c.projects_count||c.projects||0} art.</span></div>`).join('')
     : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones nacionales registradas.</div></div>';
-  document.getElementById('international-collabs').innerHTML = appData.collaborations.international.length
-    ? appData.collaborations.international.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.country||'—'} · ${c.projects_count||c.projects||0} proyectos</span></div>`).join('')
+  document.getElementById('international-collabs').innerHTML = intlConPais.length
+    ? intlConPais.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.country||c.pais} · ${c.projects_count||c.projects||0} art.</span></div>`).join('')
     : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones internacionales registradas.</div></div>';
+
+  // ── Por clasificar (sin país) ──
+  const uncCard = document.getElementById('unclassified-card');
+  const uncWrap = document.getElementById('unclassified-collabs');
+  if(uncCard && uncWrap){
+    if(porClasificar.length){
+      uncCard.style.display = 'block';
+      uncWrap.innerHTML = porClasificar.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.projects_count||c.projects||0} art. · <span style="color:var(--text3);">país no identificado</span></span></div>`).join('')
+        + '<p style="font-size:11px;color:var(--text3);margin-top:10px;">Estas instituciones no traen país en los datos de Crossref. No se muestran en el diagrama ni en las listas hasta clasificarse.</p>';
+    } else {
+      uncCard.style.display = 'none';
+    }
+  }
 }
 
 function renderAdmin() {
@@ -3504,7 +3623,9 @@ async function saveCVUResearcher(){
 // Devuelve {nuevas, coautorias}. Solo agrega lo que no existe.
 async function importarPublicacionesORCID(researcherName, orcid, opts={}){
   if(!orcid || !db || !isAdmin) return {nuevas:0, coautorias:0};
-  await loadPublications();
+  // IMPORTANTE: no recargar la tabla completa aquí. El llamador ya cargó
+  // appData.publications una sola vez. Recargar por investigador dispara el egress.
+  if(!appData.publications) appData.publications = [];
   let works;
   try { works = await fetchORCIDWorks(orcid); }
   catch(e){ return {nuevas:0, coautorias:0, error:true}; }
@@ -3517,13 +3638,24 @@ async function importarPublicacionesORCID(researcherName, orcid, opts={}){
       const added = await addCoauthorToPublication(w.doi, w.title, researcherName);
       if(added) coautorias++;
     }else{
-      const r = await savePublication({
+      const nueva = {
         title:w.title, type:'Artículo', year:w.year||new Date().getFullYear(),
         authors:w.authors||researcherName, journal:w.journal||'', doi:w.doi||'',
         if:'', quartile:'', issn:w.issn||'', url:w.url||'',
         networkAuthors:[researcherName]
-      });
-      if(r){ nuevas++; await loadPublications(); }
+      };
+      const r = await savePublication(nueva);
+      if(r){
+        nuevas++;
+        // Reflejar en memoria (SIN volver a descargar la tabla) para que
+        // la siguiente iteración detecte el duplicado/coautoría correctamente.
+        appData.publications.push({
+          title:nueva.title, type:nueva.type, year:nueva.year,
+          authors:nueva.authors, journal:nueva.journal, doi:nueva.doi,
+          issn:nueva.issn, url:nueva.url, quartile:'', if:'',
+          network_authors:[researcherName], id:(r&&r.id)||null
+        });
+      }
     }
   }
   // Detectar colaboraciones externas (nacionales/internacionales) vía Crossref
@@ -3532,7 +3664,7 @@ async function importarPublicacionesORCID(researcherName, orcid, opts={}){
       const detectadas = await detectarColaboracionesExternas(works);
       const nNac = Object.keys(detectadas.nacionales).length;
       const nInt = Object.keys(detectadas.internacionales).length;
-      if(nNac || nInt) await guardarColaboraciones(detectadas);
+      if(nNac || nInt) await guardarColaboraciones(detectadas, {skipReload:true});
     }catch(e){ console.warn('Crossref colabs:', e.message); }
   }
   return {nuevas, coautorias, works};
@@ -3543,8 +3675,13 @@ let _syncingORCID = false;
 async function sincronizarTodosORCID(){
   if(!db || !isAdmin){ openLogin(); return; }
   if(_syncingORCID){ notify('Ya hay una sincronización en curso…'); return; }
+  const conf = confirm('La sincronización consultará ORCID y Crossref para cada investigador. Puede tardar varios minutos.\n\n¿Continuar?');
+  if(!conf) return;
   _syncingORCID = true;
+  // Cargar UNA SOLA VEZ el estado necesario (evita descargar la tabla por cada investigador)
   await loadResearchers();
+  await loadPublications();
+  await loadCollaborations();
   const conOrcid = appData.researchers.filter(r => r.orcid && r.orcid.trim());
   if(!conOrcid.length){ notify('Ningún investigador tiene ORCID registrado'); _syncingORCID=false; return; }
   let totalNuevas = 0;
@@ -3556,23 +3693,20 @@ async function sincronizarTodosORCID(){
     totalNuevas += res.nuevas||0;
     await new Promise(res=>setTimeout(res, 200)); // cortesía con ORCID
   }
+  // Recargar una sola vez al final
   await loadPublications();
+  await loadCollaborations();
   refreshActiveView();
   setSyncStatus('connected', 'Sincronizado');
   notify(totalNuevas>0 ? `✓ ${totalNuevas} publicaciones nuevas importadas desde ORCID` : '✓ Todo al día — sin publicaciones nuevas en ORCID');
   _syncingORCID = false;
 }
 
-// Sincronización periódica automática (cada 6 horas mientras la pestaña esté abierta como admin)
-let _orcidAutoTimer = null;
+// NOTA: la sincronización automática periódica quedó DESACTIVADA a propósito.
+// Corría cada 6 horas y consumía mucho ancho de banda (egress) sin supervisión.
+// Ahora la sincronización es SIEMPRE manual, con el botón "Sincronizar ORCID".
 function iniciarAutoSyncORCID(){
-  if(_orcidAutoTimer) clearInterval(_orcidAutoTimer);
-  // Cada 6 horas
-  _orcidAutoTimer = setInterval(() => {
-    if(isAdmin && db && !_syncingORCID){
-      sincronizarTodosORCID();
-    }
-  }, 6*60*60*1000);
+  /* desactivado intencionalmente — ver nota arriba */
 }
 
 // ═══════════════════════════════════════════════════════════
