@@ -24,27 +24,33 @@
   --gold-pale:   #FDF8EC;   /* Dorado muy claro */
   --gob-blue:    #0B3D5E;   /* Barra de gobierno */
 
-  /* Neutrales */
+  /* Gradientes de acento (refresh) */
+  --grad-guinda: linear-gradient(135deg, #8B1A45 0%, #6A1537 55%, #4E0E28 100%);
+  --grad-gold:   linear-gradient(135deg, #E0B44A 0%, #C8960C 100%);
+
+  /* Neutrales — fondo con calidez sutil */
   --white:       #FFFFFF;
-  --bg:          #F7F7F7;
-  --bg2:         #EEEEEE;
-  --border:      #DDDDDD;
-  --border2:     #CCCCCC;
-  --text:        #333333;
-  --text2:       #555555;
-  --text3:       #888888;
+  --bg:          #F6F3F0;   /* Cálido, no gris plano */
+  --bg2:         #EDE8E3;
+  --border:      #E7E0DA;
+  --border2:     #D6CEC6;
+  --text:        #2B2422;
+  --text2:       #5A524E;
+  --text3:       #938A84;
   --link:        #6A1537;
 
   /* Tipografía IPN */
   --font-head:   'Montserrat', Arial, sans-serif;
   --font-body:   'Open Sans', Arial, sans-serif;
 
-  /* Layout */
+  /* Layout — radios más generosos y modernos */
   --sidebar-w:   248px;
-  --radius:      4px;
-  --radius-lg:   6px;
-  --shadow:      0 2px 8px rgba(0,0,0,0.10);
-  --shadow-lg:   0 4px 20px rgba(0,0,0,0.14);
+  --radius:      10px;
+  --radius-lg:   16px;
+  /* Sombras suaves en capas */
+  --shadow:      0 1px 2px rgba(74,20,45,0.04), 0 4px 12px rgba(74,20,45,0.06);
+  --shadow-lg:   0 4px 12px rgba(74,20,45,0.08), 0 12px 32px rgba(74,20,45,0.12);
+  --shadow-guinda: 0 6px 20px rgba(106,21,55,0.22);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -73,7 +79,7 @@ body {
   position: fixed;
   left: 0; top: 0; bottom: 0;
   width: var(--sidebar-w);
-  background: var(--guinda);
+  background: linear-gradient(180deg, var(--guinda) 0%, var(--guinda-dark) 100%);
   display: flex; flex-direction: column;
   z-index: 200;
   overflow-y: auto;
@@ -169,11 +175,16 @@ body {
   width: 100%; text-align: left;
 }
 .nav-item:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.nav-item:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
 .nav-item.active {
   background: rgba(255,255,255,0.15);
   color: #fff; font-weight: 600;
   border-left: 3px solid var(--gold);
   padding-left: 7px;
+  box-shadow: inset 0 0 20px rgba(200,150,12,0.08);
 }
 .nav-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
 .nav-badge {
@@ -242,13 +253,14 @@ body {
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 
 .btn {
-  padding: 7px 16px; border-radius: var(--radius);
+  padding: 8px 17px; border-radius: var(--radius);
   font-size: 12.5px; font-weight: 600; cursor: pointer;
-  border: none; transition: all 0.15s;
+  border: none; transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
   font-family: var(--font-body); letter-spacing: 0.2px;
 }
-.btn-guinda { background: var(--guinda); color: #fff; }
-.btn-guinda:hover { background: var(--guinda-mid); }
+.btn:active { transform: translateY(1px); }
+.btn-guinda { background: var(--grad-guinda); color: #fff; box-shadow: 0 2px 8px rgba(106,21,55,0.18); }
+.btn-guinda:hover { box-shadow: var(--shadow-guinda); transform: translateY(-1px); }
 .btn-outline {
   background: transparent; color: var(--guinda);
   border: 1.5px solid var(--guinda);
@@ -272,6 +284,26 @@ body {
 .section { display: none; padding: 28px 28px 40px; animation: fadeIn 0.2s ease; }
 .section.active { display: block; }
 @keyframes fadeIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Refresh: entradas escalonadas y micro-interacciones ── */
+@keyframes cardRise { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+.section.active .card,
+.section.active .stat-card,
+.section.active .chart-card {
+  animation: cardRise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.section.active .card:nth-child(2){animation-delay:0.05s}
+.section.active .card:nth-child(3){animation-delay:0.10s}
+.section.active .card:nth-child(4){animation-delay:0.15s}
+.section.active .stat-card:nth-child(2){animation-delay:0.05s}
+.section.active .stat-card:nth-child(3){animation-delay:0.10s}
+.section.active .stat-card:nth-child(4){animation-delay:0.15s}
+.section.active .chart-card:nth-child(2){animation-delay:0.08s}
+.section.active .chart-card:nth-child(3){animation-delay:0.16s}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after { animation-duration:0.001ms !important; transition-duration:0.001ms !important; }
+}
 
 /* ── HERO / BANNER ─────────────────────────────────── */
 .hero-banner {
@@ -321,36 +353,48 @@ body {
 /* ── STAT CARDS ────────────────────────────────────── */
 .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
 .stat-card {
+  position: relative; overflow: hidden;
   background: var(--white); border: 1px solid var(--border);
-  border-top: 3px solid var(--guinda);
-  border-radius: var(--radius-lg); padding: 18px 18px 16px;
+  border-radius: var(--radius-lg); padding: 20px 20px 18px;
   box-shadow: var(--shadow);
+  transition: transform 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease;
 }
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--grad-guinda);
+}
+.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
 .stat-card .sc-num {
-  font-family: var(--font-head); font-size: 28px; font-weight: 800;
+  font-family: var(--font-head); font-size: 30px; font-weight: 800;
   color: var(--guinda); line-height: 1; margin-bottom: 4px;
+  letter-spacing: -0.5px;
 }
 .stat-card .sc-lbl {
-  font-size: 11px; color: var(--text3); font-weight: 400;
-  text-transform: uppercase; letter-spacing: 0.5px;
+  font-size: 11px; color: var(--text3); font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.6px;
 }
-.stat-card .sc-icon { float: right; font-size: 20px; }
+.stat-card .sc-icon { float: right; font-size: 22px; opacity: 0.9; }
 
 /* ── CARDS ─────────────────────────────────────────── */
 .card {
   background: var(--white); border: 1px solid var(--border);
   border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-lg);
 }
 .card-header {
-  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  padding: 15px 22px; border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
-  background: linear-gradient(90deg, var(--guinda-soft), var(--white));
+  background: linear-gradient(90deg, var(--guinda-soft), transparent);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 .card-header h3 {
   font-family: var(--font-head); font-size: 13.5px; font-weight: 700;
   color: var(--guinda); text-transform: uppercase; letter-spacing: 0.5px;
 }
-.card-body { padding: 18px 20px; }
+.card-body { padding: 20px 22px; }
 
 /* ── SECTION HEADER ────────────────────────────────── */
 .section-header {
@@ -938,6 +982,104 @@ body {
   .hero-title { font-size: 20px; }
   .hero-stats { gap: 14px; flex-direction: column; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   REFRESH VISUAL — capa de modernización (no altera la identidad IPN)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Animaciones base */
+@keyframes rs-rise { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: translateY(0); } }
+@keyframes rs-pop  { 0% { transform: scale(0.96); opacity:0; } 60% { transform: scale(1.01); } 100% { transform: scale(1); opacity:1; } }
+@keyframes rs-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+@keyframes rs-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes rs-pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(200,150,12,0.35); } 70% { box-shadow: 0 0 0 10px rgba(200,150,12,0); } 100% { box-shadow: 0 0 0 0 rgba(200,150,12,0); } }
+
+/* Transición de sección más fluida */
+.section.active { animation: rs-rise 0.4s cubic-bezier(0.22,1,0.36,1); }
+
+/* Tarjetas: profundidad y respuesta al hover más ricas */
+.card, .stat-card, .chart-card, .metric-card {
+  transition: transform 0.28s cubic-bezier(0.22,1,0.36,1), box-shadow 0.28s ease, border-color 0.2s ease;
+  will-change: transform;
+}
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.chart-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+/* Stat-cards: acento superior animado + brillo sutil */
+.stat-card { position: relative; overflow: hidden; }
+.stat-card::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--grad-gold); transform: scaleX(0); transform-origin: left;
+  transition: transform 0.4s cubic-bezier(0.22,1,0.36,1);
+}
+.stat-card:hover::after { transform: scaleX(1); }
+.stat-card:hover { transform: translateY(-5px) scale(1.01); }
+.stat-card .sc-icon { transition: transform 0.35s ease; }
+.stat-card:hover .sc-icon { transform: scale(1.15) rotate(-6deg); }
+
+/* Botones: elevación y brillo al pasar */
+.btn { position: relative; overflow: hidden; transition: transform 0.18s ease, box-shadow 0.2s ease, background 0.2s ease; }
+.btn::after {
+  content: ''; position: absolute; top: 0; left: -120%; width: 60%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
+  transition: left 0.5s ease;
+}
+.btn:hover::after { left: 130%; }
+.btn-guinda:hover, .btn-gold:hover { transform: translateY(-2px); box-shadow: var(--shadow-guinda); }
+.btn:active { transform: translateY(0) scale(0.98); }
+
+/* Navegación lateral: indicador deslizante */
+.nav-item { position: relative; transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease; }
+.nav-item::before {
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%) scaleY(0);
+  width: 3px; height: 62%; background: var(--gold); border-radius: 0 3px 3px 0;
+  transition: transform 0.25s cubic-bezier(0.22,1,0.36,1);
+}
+.nav-item:hover::before, .nav-item.active::before { transform: translateY(-50%) scaleY(1); }
+.nav-item:hover { padding-left: 20px; }
+.nav-item.active { padding-left: 20px; }
+
+/* Tarjetas de investigador: brillo en el monograma */
+.rc { transition: transform 0.28s cubic-bezier(0.22,1,0.36,1), box-shadow 0.28s ease, border-color 0.2s ease; }
+.rc-monogram { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.rc:hover .rc-monogram { transform: scale(1.08); box-shadow: var(--shadow-guinda); }
+
+/* Números destacados: leve animación de aparición */
+.sc-num, .metric-num { animation: rs-pop 0.5s cubic-bezier(0.22,1,0.36,1) backwards; }
+
+/* Badge de estado en vivo (indicador de sincronización) */
+.sync-dot.connected { animation: rs-pulse-ring 2.2s infinite; }
+
+/* Skeleton loaders para estados de carga */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg2) 25%, #F3EEE9 50%, var(--bg2) 75%);
+  background-size: 800px 100%; animation: rs-shimmer 1.4s infinite linear;
+  border-radius: var(--radius);
+}
+.skeleton-row { height: 52px; margin-bottom: 10px; }
+.skeleton-card { height: 90px; }
+
+/* Modales: entrada más suave */
+.modal-overlay { transition: opacity 0.25s ease; }
+.modal-overlay.open .modal { animation: rs-pop 0.32s cubic-bezier(0.22,1,0.36,1); }
+
+/* Chips de filtro: pill con transición */
+.fc { transition: all 0.2s cubic-bezier(0.22,1,0.36,1); }
+.fc:hover { transform: translateY(-1px); }
+.fc.active { box-shadow: 0 3px 10px rgba(106,21,55,0.2); }
+
+/* Enlaces de perfil (pills) */
+.pl-link { transition: all 0.2s ease; }
+.pl-link:hover { transform: translateY(-1px); }
+
+/* Nodos SVG: transición suave al hover (grafos) */
+svg circle[onclick], svg g[onclick] { transition: opacity 0.2s ease; }
+svg g[onclick]:hover circle { opacity: 1 !important; }
+
+/* Respeta usuarios que prefieren menos movimiento */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
 </style>
 </head>
 <body>
@@ -1074,7 +1216,7 @@ body {
       <div class="stat-card"><span class="sc-icon">📈</span><div class="sc-num" id="s-active">0</div><div class="sc-lbl">Proyectos activos</div></div>
       <div class="stat-card"><span class="sc-icon">🏛️</span><div class="sc-num" id="s-units">0</div><div class="sc-lbl">Unidades académicas</div></div>
       <div class="stat-card"><span class="sc-icon">🤝</span><div class="sc-num" id="s-collabs">0</div><div class="sc-lbl">Colaboraciones</div></div>
-      <div class="stat-card"><span class="sc-icon">🔗</span><div class="sc-num" id="s-internal">0</div><div class="sc-lbl">Coautorías internas</div></div>
+      <div class="stat-card"><span class="sc-icon">🔗</span><div class="sc-num" id="s-internal">0</div><div class="sc-lbl">Colaboraciones entre unidades</div></div>
     </div>
 
     <!-- ── MÉTRICAS DE PUBLICACIONES ────────────────── -->
@@ -1825,13 +1967,44 @@ async function loadResearchers() {
 }
 
 // Cuenta las publicaciones reales de cada investigador (por coautoría de red o por texto de autores)
+// Normaliza texto: sin acentos, minúsculas
+function _normTxt(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+// ¿aparece 'w' como palabra completa dentro de 'texto'?
+function _esPalabra(texto, w){
+  if(!w) return false;
+  const esc = w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp('(^|[^a-z0-9])'+esc+'([^a-z0-9]|$)').test(texto);
+}
+
+// Cuenta las publicaciones de un investigador.
+// Criterio estricto: la coautoría verificada (network_authors) manda. La coincidencia
+// por texto solo aplica a artículos sin clasificar y exige apellido completo como
+// palabra MÁS el segundo apellido o la inicial del nombre — así un apellido común
+// (García, López…) no captura artículos de personas ajenas a la Red.
 function contarPublicaciones(researcherName){
   if(!appData.publications) return 0;
-  const partes = researcherName.split(' ').filter(w=>w.length>2);
-  const apellido = (partes[1] || partes[0] || '').toLowerCase();
+  const partes = (researcherName||'').trim().split(/\s+/).filter(Boolean);
+  const nIni = _normTxt(partes[0]||'')[0] || '';
+  const ap1  = _normTxt(partes[1]||'');
+  const ap2  = _normTxt(partes[2]||'');
+  const objetivo = _normTxt(researcherName);
+
   return appData.publications.filter(p => {
-    if(Array.isArray(p.network_authors) && p.network_authors.includes(researcherName)) return true;
-    if(apellido && p.authors && p.authors.toLowerCase().includes(apellido)) return true;
+    const na = Array.isArray(p.network_authors) ? p.network_authors : [];
+    // 1) Coautoría verificada de la Red
+    if(na.some(a => _normTxt(a) === objetivo)) return true;
+    // 2) Si el artículo ya tiene coautores de la Red y él no está, no es suyo
+    if(na.length) return false;
+    // 3) Artículo sin clasificar: coincidencia estricta por texto
+    if(!p.authors || !ap1) return false;
+    const t = _normTxt(p.authors);
+    if(!_esPalabra(t, ap1)) return false;
+    if(ap2 && _esPalabra(t, ap2)) return true;            // ambos apellidos presentes
+    if(nIni){                                              // apellido junto a la inicial
+      const esc = ap1.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const patron = new RegExp('(^|[^a-z])'+nIni+'[a-z]*\\.?\\s+'+esc+'|'+esc+',?\\s+'+nIni+'([^a-z]|$)');
+      if(patron.test(t)) return true;
+    }
     return false;
   }).length;
 }
@@ -2261,20 +2434,37 @@ function initials(n) {
   return n.split(' ').filter(w => w.length > 2).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 }
 
+// Anima un número de 0 (o su valor actual) hasta el destino
+function animarContador(el, destino, dur=900){
+  if(!el) return;
+  // Respetar preferencia de menos movimiento
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    el.textContent = destino; return;
+  }
+  const inicio = 0;
+  const t0 = performance.now();
+  function paso(t){
+    const p = Math.min((t - t0) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3); // ease-out cúbico
+    el.textContent = Math.round(inicio + (destino - inicio) * eased);
+    if(p < 1) requestAnimationFrame(paso);
+    else el.textContent = destino;
+  }
+  requestAnimationFrame(paso);
+}
+
 function renderDashboard() {
   document.getElementById('hs-r').textContent = appData.researchers.length;
   document.getElementById('hs-p').textContent = appData.projects.length;
   document.getElementById('hs-pub').textContent = appData.publications.length;
   document.getElementById('nb-r').textContent = appData.researchers.length;
-  document.getElementById('s-active').textContent = appData.projects.filter(p=>p.status==='Activo').length;
   const units = new Set(appData.researchers.map(r=>r.unit||r.inst).filter(Boolean));
-  document.getElementById('s-units').textContent = units.size;
-  // Colaboraciones externas (nacionales + internacionales) y coautorías internas
+  // Contadores animados en las tarjetas de estadística
+  animarContador(document.getElementById('s-active'), appData.projects.filter(p=>p.status==='Activo').length);
+  animarContador(document.getElementById('s-units'), units.size);
   const totalCollabs = (appData.collaborations.national?.length||0) + (appData.collaborations.international?.length||0);
-  const sCollabs = document.getElementById('s-collabs');
-  if(sCollabs) sCollabs.textContent = totalCollabs;
-  const sInternal = document.getElementById('s-internal');
-  if(sInternal) sInternal.textContent = computeUnitCollaborations().length;
+  animarContador(document.getElementById('s-collabs'), totalCollabs);
+  animarContador(document.getElementById('s-internal'), computeUnitCollaborations().length);
 
   const dp = document.getElementById('dash-projects');
   dp.innerHTML = appData.projects.length ? appData.projects.slice(0,4).map(p=>`
@@ -2635,13 +2825,16 @@ function showResearcherDetail(id) {
   if (r.orcid) {
     pc.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text3);">🔄 Cargando publicaciones desde ORCID…</div>';
     fetchORCIDWorks(r.orcid).then(works => {
-      pc.innerHTML = works.length ? works.map(w=>`
+      const encabezado = works.length
+        ? `<div style="font-size:11.5px;color:var(--text3);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);">${works.length} publicación${works.length!==1?'es':''} en ORCID</div>`
+        : '';
+      pc.innerHTML = encabezado + (works.length ? works.map(w=>`
         <div style="padding:11px 0;border-bottom:1px solid var(--border);">
           <div style="font-family:var(--font-head);font-size:13.5px;font-weight:600;color:var(--guinda);margin-bottom:3px;line-height:1.4;">${w.title}</div>
           <div style="font-size:11.5px;color:var(--text3);">${w.journal||''} ${w.year?'· '+w.year:''}</div>
           ${w.doi?`<a href="https://doi.org/${w.doi}" target="_blank" class="pl-link" style="display:inline-flex;margin-top:7px;font-size:10px;">DOI ↗</a>`:''}
         </div>`).join('') :
-        '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-desc">Sin publicaciones públicas en ORCID o el perfil es privado.</div></div>';
+        '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-desc">Sin publicaciones públicas en ORCID o el perfil es privado.</div></div>');
     }).catch(() => { pc.innerHTML = '<div class="empty-state"><div class="empty-desc">No se pudo conectar con ORCID. Verifica tu conexión a internet.</div></div>'; });
   } else {
     pc.innerHTML = '<div class="empty-state"><div class="empty-icon">🟢</div><div class="empty-title">ORCID no registrado</div><div class="empty-desc">Las publicaciones se mostrarán automáticamente una vez vinculado el ORCID.</div></div>';
@@ -2673,17 +2866,41 @@ function showResearcherDetail(id) {
   openModal('modal-researcher-detail');
 }
 
-async function fetchORCIDWorks(orcid) {
+async function fetchORCIDWorks(orcid, limite=300) {
   const res = await fetch(`https://pub.orcid.org/v3.0/${orcid}/works`, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error('ORCID error');
   const data = await res.json();
-  return (data.group||[]).slice(0,50).map(g => {
-    const ws = g['work-summary']?.[0]; if (!ws) return null;
-    const ids = ws['external-ids']?.['external-id']||[];
-    const doi = ids.find(x=>x['external-id-type']==='doi')?.['external-id-value']||'';
-    const issn = ids.find(x=>x['external-id-type']==='issn')?.['external-id-value']||'';
-    return { title: ws.title?.title?.value||'Sin título', year: ws['publication-date']?.year?.value||'', journal: ws['journal-title']?.value||'', doi, issn, url: doi?'https://doi.org/'+doi:(ws.url?.value||'') };
+  const grupos = data.group || [];
+  const obras = grupos.map(g => {
+    const sums = g['work-summary'] || [];
+    if(!sums.length) return null;
+    // Elegir el resumen más completo del grupo (con año y DOI si es posible)
+    let ws = sums[0];
+    for(const s of sums){
+      const tieneDOI = (s['external-ids']?.['external-id']||[]).some(x=>x['external-id-type']==='doi');
+      const tieneAnio = s['publication-date']?.year?.value;
+      if(tieneDOI && tieneAnio){ ws = s; break; }
+      if(tieneAnio && !ws['publication-date']?.year?.value) ws = s;
+    }
+    // Reunir los IDs de TODO el grupo (a veces el DOI está en otro resumen)
+    let doi='', issn='';
+    for(const s of sums){
+      const ids = s['external-ids']?.['external-id']||[];
+      if(!doi) doi = ids.find(x=>x['external-id-type']==='doi')?.['external-id-value']||'';
+      if(!issn) issn = ids.find(x=>x['external-id-type']==='issn')?.['external-id-value']||'';
+    }
+    return {
+      title: ws.title?.title?.value||'Sin título',
+      year: ws['publication-date']?.year?.value||'',
+      journal: ws['journal-title']?.value||'',
+      type: ws.type||'',
+      doi, issn,
+      url: doi ? 'https://doi.org/'+doi : (ws.url?.value||'')
+    };
   }).filter(Boolean);
+  // Ordenar por año descendente (más recientes primero) y aplicar el tope
+  obras.sort((a,b) => (parseInt(b.year)||0) - (parseInt(a.year)||0));
+  return obras.slice(0, limite);
 }
 
 function renderProjects(filtered = appData.projects) {
