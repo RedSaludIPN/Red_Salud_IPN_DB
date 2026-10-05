@@ -1596,7 +1596,7 @@ svg g[onclick]:hover circle { opacity: 1 !important; }
       <div class="form-row"><div class="fg"><label>Nombre completo *</label><input type="text" id="r-name" placeholder="Dra. Nombre Apellido Apellido"></div><div class="fg"><label>Unidad académica</label><input type="text" id="r-unit" placeholder="ESM, ENCB, CBG…"></div></div>
       <div class="form-row"><div class="fg"><label>Institución</label><input type="text" id="r-inst" placeholder="IPN – Escuela Superior de Medicina"></div><div class="fg"><label>Nivel SNI</label><select id="r-sni"><option>Candidato</option><option>Nivel I</option><option>Nivel II</option><option>Nivel III</option><option>Emérito</option><option>No aplica</option></select></div></div>
       <div class="form-row"><div class="fg"><label>ORCID</label><input type="text" id="r-orcid" placeholder="0000-0000-0000-0000"></div><div class="fg"><label>No. CVU Rizoma</label><input type="text" id="r-cvu" placeholder="Ej: 559655"></div></div>
-      <div class="form-row"><div class="fg"><label>Área de investigación</label><select id="r-area"><option>Salud Pública</option><option>Clínica</option><option>Básica</option><option>Epidemiología</option><option>Nutrición</option><option>Conducta</option><option>Otra</option></select></div><div class="fg"><label>Email institucional</label><input type="email" id="r-email" placeholder="investigador@ipn.mx"></div></div>
+      <div class="form-row"><div class="fg"><label>Área de investigación</label><select id="r-area"><option value="">— Seleccionar —</option><option>Metabolismo, homeostasis y resiliencia fisiológica</option><option>Procesos infecciosos e interacción huésped-microorganismo</option><option>Reproducción, desarrollo y salud de la mujer</option><option>Envejecimiento, longevidad y funcionalidad</option><option>Neurociencias y salud mental</option></select></div><div class="fg"><label>Email institucional</label><input type="email" id="r-email" placeholder="investigador@ipn.mx"></div></div>
       <div class="form-row"><div class="fg"><label>Extensión IPN</label><input type="text" id="r-ext" placeholder="Ej: 62743"></div><div class="fg"></div></div>
       <div class="form-row full"><div class="fg"><label>Líneas de investigación (separadas por coma)</label><input type="text" id="r-lines" placeholder="Enfermedades crónicas, Farmacología…"></div></div>
       <div class="form-row full"><div class="fg"><label>Semblanza académica</label><textarea id="r-bio" placeholder="Trayectoria, grados obtenidos, área de especialidad…"></textarea></div></div>
@@ -2178,7 +2178,7 @@ function openResearcherEdit(id){
   document.getElementById('edit-r-extlab').value = r.ext_laboratorio || '';
   document.getElementById('edit-r-ext').value = r.ext || '';
   document.getElementById('edit-r-email').value = r.email || '';
-  document.getElementById('edit-r-area').value = r.area || 'Clínica';
+  document.getElementById('edit-r-area').value = r.area || '';
   document.getElementById('edit-r-sni').value = r.sni || 'No aplica';
   document.getElementById('edit-r-lines').value = (r.lines||[]).join(', ');
   document.getElementById('edit-r-bio').value = r.bio || '';
@@ -2734,15 +2734,11 @@ function toggleResearcherCard(id){
 let _groupByExp = false;
 // Temas de experiencia con palabras clave (en títulos de artículos y revistas)
 const TEMAS_EXPERIENCIA = [
-  ['Farmacología y Productos Naturales', /pharmacol|farmacol|drug|fármac|natural product|phytochem|fitoqu[ií]m|extract|flavon|anthocyan|antioxidant|antioxidante|bioactiv/i],
-  ['Cardiovascular y Metabolismo', /cardiov|cardiac|hypertens|hipertens|metaboli|diabet|obesit|obesidad|lipid|cholesterol|colesterol|glucos|insulin/i],
-  ['Oncología y Cáncer', /cancer|c[aá]ncer|tumor|oncolog|carcino|neoplas|leukemi|leucemia|metasta/i],
-  ['Neurociencia y Salud Mental', /neuro|brain|cerebr|cognit|alzheim|parkinson|depress|ansiedad|anxiety|ment|psiqui|psych/i],
-  ['Inmunología e Infecciones', /immun|inmun|infect|infecc|viral|virus|bacteri|microbi|antimicrob|vaccine|vacuna|antib/i],
-  ['Bioquímica y Biología Molecular', /biochem|bioqu[ií]m|molecular|genom|gen[eé]tic|protein|enzyme|enzima|cellular|celular|signaling|señaliz/i],
-  ['Nutrición y Alimentos', /nutri|food|aliment|diet|obes|vitamin|mineral|micronutri/i],
-  ['Salud Pública y Epidemiología', /public health|salud p[uú]blica|epidemiol|prevalen|incidence|incidencia|cohort|cohorte|population|poblaci[oó]n/i],
-  ['Química Analítica y Metabolómica', /chromatograph|cromatograf|mass spectrom|espectrometr|metabolom|hplc|analytical|anal[ií]tic|nmr/i]
+  ['Metabolismo, homeostasis y resiliencia fisiológica', /cardiov|cardiac|hypertens|hipertens|metaboli|diabet|obes|lipid|cholesterol|colesterol|glucos|insulin|oxidative|oxidativ|antioxid|inflamm|inflamac|renal|kidney|ri[ñn][oó]n|liver|h[ií]gado|hepat|cancer|c[aá]ncer|tumor|oncolog|nutri|food|aliment|diet|homeosta/i],
+  ['Procesos infecciosos e interacción huésped-microorganismo', /immun|inmun|infect|infecc|viral|virus|bacteri|microbi|antimicrob|vaccine|vacuna|parasit|fung|hongo|pathogen|pat[oó]geno|microbiota|tubercul|covid|sars/i],
+  ['Reproducción, desarrollo y salud de la mujer', /pregnan|embaraz|fetal|feto|placent|preeclamp|matern|neonat|reproduct|reproduc|ovar|uter|[uú]tero|endometr|menopaus|gestat|gestac|infant|lactan|fertil|sperm|esperm/i],
+  ['Envejecimiento, longevidad y funcionalidad', /aging|ageing|envejec|elderly|older adult|adulto mayor|geriatr|longevi|senescen|sarcopen|frailty|fragilidad|osteopor|dementia|demencia|funcionalidad|functional decline/i],
+  ['Neurociencias y salud mental', /neuro|brain|cerebr|cognit|alzheim|parkinson|depress|anxiety|ansiedad|psych|psiqui|behavio|conduct|epilep|stress|estr[eé]s|mental|sleep|sue[ñn]o/i]
 ];
 
 function inferirExperiencia(researcherName){
@@ -2794,7 +2790,7 @@ function renderResearchersGrouped(){
   temasOrdenados.forEach(tema => {
     html += `<div style="margin-bottom:24px;">
       <div style="font-family:var(--font-head);font-size:14px;font-weight:800;color:var(--guinda);padding:8px 0;border-bottom:2px solid var(--gold);margin-bottom:14px;display:flex;align-items:center;gap:8px;">
-        🔬 ${tema} <span style="font-size:11px;color:var(--text3);font-weight:600;">(${grupos[tema].length})</span>
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${(typeof AREA_COLORS!=='undefined'&&AREA_COLORS[tema])||'var(--guinda)'};margin-right:8px;"></span>${tema} <span style="font-size:11px;color:var(--text3);font-weight:600;">(${grupos[tema].length})</span>
       </div>
       <div class="researcher-grid">${grupos[tema].map(r=>tarjetaInvestigador(r)).join('')}</div>
     </div>`;
@@ -3662,8 +3658,7 @@ function parseCVURizoma(items){
 
   // ── Mapeo de área principal (para el selector) ──
   const blob=(area+' '+campo+' '+disc+' '+subdisc).toLowerCase();
-  const areaMap=[[/farmacol|molecul|biolog|bioqu|gen[oó]m|qu[ií]m|fisiolog/i,'Básica'],[/epidem/i,'Epidemiología'],[/salud p[uú]bl|comunit/i,'Salud Pública'],[/cl[ií]nic|m[eé]dic/i,'Clínica'],[/nutrici/i,'Nutrición'],[/conduct|psic/i,'Conducta']];
-  let areaSelect='Clínica';for(const[rx,v]of areaMap){if(rx.test(blob)){areaSelect=v;break;}}
+  let areaSelect=mapearAreaRed(blob);
 
   const areaCompleta=[area,campo,disc,subdisc].filter(Boolean).map(toTitleCase).join(' › ');
 
@@ -4173,15 +4168,20 @@ function siglaUnidad(v){
   return s.substring(0,8).toUpperCase();
 }
 function mapearAreaRed(areasStr){
+  // Si la celda ya trae una de las 5 áreas de la Red, se respeta
+  const directa = mapAreaRed(areasStr);
+  const AREAS5 = ['Metabolismo, homeostasis y resiliencia fisiológica','Procesos infecciosos e interacción huésped-microorganismo','Reproducción, desarrollo y salud de la mujer','Envejecimiento, longevidad y funcionalidad','Neurociencias y salud mental'];
+  if(AREAS5.includes(directa)) return directa;
+  // Si trae temas de expertiz, se infiere por votación de palabras clave
   const t = String(areasStr||'').toLowerCase();
   const scores = {
-    'Enfermedades crónico-degenerativas': (t.match(/cr[oó]nico|degenerat|c[aá]ncer|oncol|diabet|metaból|cardio/g)||[]).length,
-    'Enfermedades infecto-contagiosas': (t.match(/infeccios|diagn[oó]stico r[aá]pido|epidemiolog|genómic|vacun|microb|inmunoter/g)||[]).length,
-    'Enfermedades perinatales y del embarazo': (t.match(/materno|fetal|perinatal|embarazo|neonat/g)||[]).length,
-    'Alimentación y nutrición': (t.match(/nutrici|obesidad|aliment/g)||[]).length,
-    'Conducta': (t.match(/neuro|conduct|trastorno|salud mental|psic|neurodesarrollo/g)||[]).length
+    'Metabolismo, homeostasis y resiliencia fisiológica': (t.match(/cr[oó]nico|degenerat|c[aá]ncer|oncol|diabet|metab[oó]l|cardio|obesidad|nutrici|aliment|renal/g)||[]).length,
+    'Procesos infecciosos e interacción huésped-microorganismo': (t.match(/infeccios|diagn[oó]stico r[aá]pido|epidemiolog|gen[oó]mic|vacun|microb|inmun/g)||[]).length,
+    'Reproducción, desarrollo y salud de la mujer': (t.match(/materno|fetal|perinatal|embarazo|neonat|reproducc|mujer/g)||[]).length,
+    'Envejecimiento, longevidad y funcionalidad': (t.match(/envejec|longev|geriatr|adulto mayor|funcionalidad|fragilidad/g)||[]).length,
+    'Neurociencias y salud mental': (t.match(/neuro|conduct|trastorno|salud mental|psic|neurodesarrollo/g)||[]).length
   };
-  let best='Enfermedades crónico-degenerativas', max=0;
+  let best='', max=0;
   for(const [a,n] of Object.entries(scores)){ if(n>max){max=n;best=a;} }
   return best;
 }
