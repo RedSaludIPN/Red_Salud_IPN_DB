@@ -1771,30 +1771,35 @@ let appData = {
 // UNIDADES ACADÉMICAS DEL IPN — nombres completos
 // ═══════════════════════════════════════════════════════════
 const UNIDADES_IPN = {
-  'ESM':     'Escuela Superior de Medicina',
-  'ENCB':    'Escuela Nacional de Ciencias Biológicas',
-  'ENMH':    'Escuela Nacional de Medicina y Homeopatía',
-  'ESEO':    'Escuela Superior de Enfermería y Obstetricia',
-  'CBG':     'Centro de Biotecnología Genómica',
-  'CEPROBI': 'Centro de Desarrollo de Productos Bióticos',
-  'CIIDIR':  'Centro Interdisciplinario de Investigación para el Desarrollo Integral Regional',
-  'CICATA':  'Centro de Investigación en Ciencia Aplicada y Tecnología Avanzada',
-  'CICIMAR': 'Centro Interdisciplinario de Ciencias Marinas',
-  'CICS':    'Centro Interdisciplinario de Ciencias de la Salud',
-  'CICS-UST':'Centro Interdisciplinario de Ciencias de la Salud Unidad Santo Tomás',
-  'CICS-MA': 'Centro Interdisciplinario de Ciencias de la Salud Unidad Milpa Alta',
-  'CIECAS':  'Centro de Investigaciones Económicas, Administrativas y Sociales',
-  'CIIEMAD': 'Centro Interdisciplinario de Investigaciones y Estudios sobre Medio Ambiente y Desarrollo',
-  'CITEDI':  'Centro de Investigación y Desarrollo de Tecnología Digital',
-  'UPIBI':   'Unidad Profesional Interdisciplinaria de Biotecnología',
-  'UPIITA':  'Unidad Profesional Interdisciplinaria en Ingeniería y Tecnologías Avanzadas',
-  'UPIIZ':   'Unidad Profesional Interdisciplinaria de Ingeniería Campus Zacatecas',
-  'ESCOM':   'Escuela Superior de Cómputo',
-  'ESIME':   'Escuela Superior de Ingeniería Mecánica y Eléctrica',
-  'ESIQIE':  'Escuela Superior de Ingeniería Química e Industrias Extractivas',
-  'ESFM':    'Escuela Superior de Física y Matemáticas',
-  'ENBA':    'Escuela Nacional de Biblioteconomía y Archivonomía',
-  'CINVESTAV':'Centro de Investigación y de Estudios Avanzados del IPN'
+  'CBG':        'Centro de Biotecnología Genómica',
+  'CECYT 18':   'Centro de Estudios Científicos y Tecnológicos No. 18',
+  'CEPROBI':    'Centro de Desarrollo de Productos Bióticos',
+  'CICATA':     'Centro de Investigación en Ciencia Aplicada y Tecnología Avanzada',
+  'CICATA-MOR': 'CICATA Unidad Morelos',
+  'CICIMAR':    'Centro Interdisciplinario de Ciencias Marinas',
+  'CICS':       'Centro Interdisciplinario de Ciencias de la Salud',
+  'CICS M. A.': 'CICS Unidad Milpa Alta',
+  'CICS UST':   'CICS Unidad Santo Tomás',
+  'CIECAS':     'Centro de Investigaciones Económicas, Administrativas y Sociales',
+  'CIIDIR':     'Centro Interdisciplinario de Investigación para el Desarrollo Integral Regional',
+  'CIIDIR DGO': 'CIIDIR Unidad Durango',
+  'CIIDIR OAX': 'CIIDIR Unidad Oaxaca',
+  'CIIDIR SIN': 'CIIDIR Unidad Sinaloa',
+  'CIIEMAD':    'Centro Interdisciplinario de Investigaciones y Estudios sobre Medio Ambiente y Desarrollo',
+  'CITEDI':     'Centro de Investigación y Desarrollo de Tecnología Digital',
+  'ENCB':       'Escuela Nacional de Ciencias Biológicas',
+  'ENMH':       'Escuela Nacional de Medicina y Homeopatía',
+  'ESCOM':      'Escuela Superior de Cómputo',
+  'ESM':        'Escuela Superior de Medicina',
+  'UPIBI':      'Unidad Profesional Interdisciplinaria de Biotecnología',
+  'UPIITA':     'Unidad Profesional Interdisciplinaria en Ingeniería y Tecnologías Avanzadas',
+  'UPIIZ':      'Unidad Profesional Interdisciplinaria de Ingeniería Campus Zacatecas',
+  'ESEO':       'Escuela Superior de Enfermería y Obstetricia',
+  'ESIME':      'Escuela Superior de Ingeniería Mecánica y Eléctrica',
+  'ESIQIE':     'Escuela Superior de Ingeniería Química e Industrias Extractivas',
+  'ESFM':       'Escuela Superior de Física y Matemáticas',
+  'ENBA':       'Escuela Nacional de Biblioteconomía y Archivonomía',
+  'CINVESTAV':  'Centro de Investigación y de Estudios Avanzados del IPN'
 };
 function nombreUnidad(sigla){
   if(!sigla) return '';
@@ -3518,10 +3523,13 @@ function parseFichaRegistro(fields){
   if(!lines.length && disciplina) lines = [disciplina];
   const areaRed = fields.area_red || '';
   // La unidad viene del dropdown como "ESM — Escuela Superior de Medicina"; tomar solo la sigla
+  // La unidad viene del desplegable como "SIGLA — Nombre completo".
+  // Se toma todo lo que está antes del guion largo (admite espacios y puntos:
+  // "CECyT 18", "CICS M. A.", "CIIDIR SIN").
   let unit = (fields.unidad||'').trim();
-  const siglaMatch = unit.match(/^([A-ZÁÉÍÓÚÑ0-9\-]+)\s*[—–\-]/);
-  if(siglaMatch) unit = siglaMatch[1].trim();
-  else unit = unit.toUpperCase();
+  const corte = unit.split(/\s+[—–]\s+/)[0];
+  unit = (corte || unit).trim();
+  if(!/[a-záéíóúñ]/.test(unit.replace(/CyT/i,''))) unit = unit.toUpperCase();
   return {
     nombre,
     sexo: fields.sexo || '',
