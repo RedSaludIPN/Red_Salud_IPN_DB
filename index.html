@@ -2580,7 +2580,7 @@ function renderSNIIPie(){
           return `<div class="snii-legend-item">
             <span class="snii-legend-dot" style="background:${d.color};"></span>
             <span>${d.nivel}</span>
-            <span class="snii-legend-count">${d.n} · ${pct}%</span>
+            <span class="snii-legend-count" title="${d.n} investigador${d.n!==1?'es':''}">${pct}%</span>
           </div>`;
         }).join('')}
         <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:5px;font-size:10.5px;color:var(--text3);">
@@ -2676,6 +2676,24 @@ function renderMetrics() {
   }
 }
 
+
+// Convierte lo que el investigador escribió en una liga válida y absoluta.
+// Acepta: URL completa, URL sin "https://", o solo el identificador.
+function normalizarLiga(valor, tipo){
+  let v = String(valor||'').trim();
+  if(!v) return '';
+  if(tipo==='scopus'){
+    const id = (v.match(/authorId=(\d+)/i)||[])[1] || (/^\d{6,}$/.test(v) ? v : '');
+    if(id) return 'https://www.scopus.com/authid/detail.uri?authorId='+id;
+  }
+  if(tipo==='scholar'){
+    const user = (v.match(/[?&]user=([\w-]+)/i)||[])[1];
+    if(user) return 'https://scholar.google.com/citations?user='+user;
+  }
+  if(!/^https?:\/\//i.test(v)) v = 'https://' + v.replace(/^\/+/, '');
+  return v;
+}
+
 function tarjetaInvestigador(r){
   const unidadFull = r.unit ? nombreUnidad(r.unit) : '';
   return `
@@ -2702,8 +2720,8 @@ function tarjetaInvestigador(r){
           <div class="rc-detail-row"><span class="rc-detail-ic">📄</span><div><div class="rc-detail-lbl">Publicaciones${(r.orcid_works!==null&&r.orcid_works!==undefined)?' (ORCID)':' (en la Red)'}</div><div class="rc-detail-val">${pubsMostradas(r)}</div></div></div>
           <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
             ${r.orcid?`<a class="pl-link" href="https://orcid.org/${r.orcid}" target="_blank" onclick="event.stopPropagation()">ORCID</a>`:''}
-            ${r.scopus?`<a class="pl-link" href="${r.scopus}" target="_blank" onclick="event.stopPropagation()">Scopus</a>`:''}
-            <a class="pl-link" href="${r.scholar||('https://scholar.google.com/scholar?q='+encodeURIComponent(r.name))}" target="_blank" onclick="event.stopPropagation()">Scholar</a>
+            ${r.scopus?`<a class="pl-link" href="${normalizarLiga(r.scopus,'scopus')}" target="_blank" onclick="event.stopPropagation()">Scopus</a>`:''}
+            <a class="pl-link" href="${r.scholar?normalizarLiga(r.scholar,'scholar'):('https://scholar.google.com/scholar?q='+encodeURIComponent(r.name))}" target="_blank" onclick="event.stopPropagation()">Scholar</a>
             <button class="pl-link" onclick="event.stopPropagation();showResearcherDetail('${r.id}')" style="cursor:pointer;background:none;font-family:var(--font-head);">Ver perfil →</button>
             <button class="pl-link admin-only" onclick="event.stopPropagation();openResearcherEdit('${r.id}')" style="cursor:pointer;background:var(--gold-pale);border-color:var(--gold);color:var(--gold);font-family:var(--font-head);">✏️ Editar</button>
           </div>
@@ -3539,8 +3557,8 @@ function parseFichaRegistro(fields){
     areaRed: mapAreaRed(areaRed) || areaRed,
     orcid,
     disciplina,
-    scopus: fields.scopus || '',
-    scholar: fields.scholar || ''
+    scopus: normalizarLiga(fields.scopus, 'scopus'),
+    scholar: normalizarLiga(fields.scholar, 'scholar')
   };
 }
 
