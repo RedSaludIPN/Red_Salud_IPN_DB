@@ -711,6 +711,8 @@ body {
 #map-container { height: 460px; }
 .collab-map { height: 460px; border-radius: var(--radius); border: 1px solid var(--border); z-index: 0; }
 .collab-map .leaflet-popup-content { margin: 10px 12px; }
+.collab-map .leaflet-tile-pane { filter: grayscale(1) contrast(0.92) brightness(1.06); }
+.collab-map { background: #EEF0F1; }
 .info-row.clicable { cursor: pointer; }
 .info-row.clicable:hover .ir-label { color: var(--guinda); text-decoration: underline; }
 @media (max-width: 640px){ .collab-map { height: 320px; } }
@@ -1427,11 +1429,6 @@ svg g[onclick]:hover circle { opacity: 1 !important; }
     <div class="card" style="margin-bottom:20px;">
       <div class="card-header"><h3>🏛️ Colaboraciones entre Unidades Académicas</h3><span style="font-size:10.5px;color:var(--text3);font-family:var(--font-body);">Coautorías entre unidades del IPN</span></div>
       <div class="card-body" id="unit-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se calculan automáticamente cuando investigadores de distintas unidades comparten un artículo.</div></div></div>
-    </div>
-
-    <div class="grid-2">
-      <div class="card"><div class="card-header"><h3>🇲🇽 Colaboraciones Nacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · OpenAlex</span></div><div class="card-body" id="national-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores.</div></div></div></div>
-      <div class="card"><div class="card-header"><h3>🌍 Colaboraciones Internacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · OpenAlex</span></div><div class="card-body" id="international-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores.</div></div></div></div>
     </div>
 
     <div class="card mt-20" id="unclassified-card" style="display:none;">
@@ -3500,9 +3497,10 @@ function _crearMapa(tipo){
   const el = document.getElementById(tipo==='national' ? 'map-mx' : 'map-world');
   if(!el || typeof L==='undefined') return null;
   const mapa = L.map(el, { scrollWheelZoom: false, worldCopyJump: true, minZoom: 1 });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> · Datos: OpenAlex',
-    subdomains: 'abcd', maxZoom: 18
+  // Mosaicos de OpenStreetMap: gratuitos y sin clave (requieren la atribución)
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> · Datos: OpenAlex',
+    maxZoom: 18
   }).addTo(mapa);
   // Rueda del ratón solo tras hacer clic en el mapa (no secuestra el scroll de la página)
   mapa.on('click', () => mapa.scrollWheelZoom.enable());
@@ -3514,7 +3512,7 @@ function _crearMapa(tipo){
 function renderCollabMaps(nat, intl){
   const aviso = document.getElementById('map-aviso');
   if(typeof L === 'undefined'){
-    if(aviso) aviso.textContent = 'No se pudo cargar el mapa (revisa tu conexión). Las listas de abajo muestran todas las colaboraciones.';
+    if(aviso) aviso.textContent = 'No se pudo cargar el mapa. Revisa tu conexión y recarga la página.';
     return;
   }
   const datos = { national: nat, international: intl };
@@ -3621,14 +3619,6 @@ function renderCollaborations() {
       : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Aún no hay coautorías entre distintas unidades. Se detectan cuando investigadores de unidades diferentes comparten un artículo.</div></div>';
   }
 
-  // ── Listas nacionales / internacionales (orden alfabético) ──
-  document.getElementById('national-collabs').innerHTML = nat.length
-    ? nat.map(c=>`<div class="info-row clicable" title="Ver en el mapa" onclick="enfocarColab('national', this.dataset.inst)" data-inst="${_escHtml(c.inst)}"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.city||'México'} · ${c.projects_count||c.projects||0} art.</span></div>`).join('')
-    : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones nacionales registradas.</div></div>';
-  document.getElementById('international-collabs').innerHTML = intlConPais.length
-    ? intlConPais.map(c=>`<div class="info-row clicable" title="Ver en el mapa" onclick="enfocarColab('international', this.dataset.inst)" data-inst="${_escHtml(c.inst)}"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${[c.city,c.country||c.pais].filter(Boolean).join(', ')} · ${c.projects_count||c.projects||0} art.</span></div>`).join('')
-    : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones internacionales registradas.</div></div>';
-
   // ── Por clasificar (sin país) ──
   const uncCard = document.getElementById('unclassified-card');
   const uncWrap = document.getElementById('unclassified-collabs');
@@ -3636,7 +3626,7 @@ function renderCollaborations() {
     if(porClasificar.length){
       uncCard.style.display = 'block';
       uncWrap.innerHTML = porClasificar.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.projects_count||c.projects||0} art. · <span style="color:var(--text3);">país no identificado</span></span></div>`).join('')
-        + '<p style="font-size:11px;color:var(--text3);margin-top:10px;">Estas instituciones no tienen país registrado en OpenAlex. No se muestran en el diagrama ni en las listas hasta clasificarse.</p>';
+        + '<p style="font-size:11px;color:var(--text3);margin-top:10px;">Estas instituciones no tienen país registrado en OpenAlex. No se muestran en los mapas hasta clasificarse.</p>';
     } else {
       uncCard.style.display = 'none';
     }
