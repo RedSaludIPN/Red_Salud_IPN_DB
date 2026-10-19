@@ -1415,8 +1415,8 @@ svg g[onclick]:hover circle { opacity: 1 !important; }
     </div>
 
     <div class="grid-2">
-      <div class="card"><div class="card-header"><h3>🇲🇽 Colaboraciones Nacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · Crossref</span></div><div class="card-body" id="national-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores.</div></div></div></div>
-      <div class="card"><div class="card-header"><h3>🌍 Colaboraciones Internacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · Crossref</span></div><div class="card-body" id="international-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores.</div></div></div></div>
+      <div class="card"><div class="card-header"><h3>🇲🇽 Colaboraciones Nacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · OpenAlex</span></div><div class="card-body" id="national-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores.</div></div></div></div>
+      <div class="card"><div class="card-header"><h3>🌍 Colaboraciones Internacionales</h3><span style="font-size:10px;color:var(--text3);font-family:var(--font-body);">Auto · OpenAlex</span></div><div class="card-body" id="international-collabs"><div class="empty-state" style="padding:24px;"><div class="empty-desc">Se detectan automáticamente de las afiliaciones de coautores.</div></div></div></div>
     </div>
 
     <div class="card mt-20" id="unclassified-card" style="display:none;">
@@ -1491,6 +1491,7 @@ svg g[onclick]:hover circle { opacity: 1 !important; }
         <button class="btn btn-outline" onclick="exportCSV()">⬇ CSV investigadores</button>
         <button class="btn btn-outline" onclick="exportCSVProjects()">⬇ CSV proyectos</button>
         <button class="btn btn-gold" onclick="syncToSupabase()">☁️ Forzar sincronía</button>
+        <button class="btn btn-guinda" onclick="reconstruirColaboraciones()" title="Recalcula las colaboraciones con OpenAlex a partir de los DOI de las publicaciones">🌐 Reconstruir colaboraciones</button>
       </div>
     </div>
   </section>
@@ -2079,29 +2080,50 @@ async function loadCollaborations() {
 }
 
 // ── TIEMPO REAL — cambios aparecen instantáneamente ────────
+// Agrupa los avisos en tiempo real: una ráfaga de cambios produce UNA sola recarga.
+// Durante una sincronización o reconstrucción, el navegador del admin no recarga.
+const _rtTimers = {};
+function _rtDebounce(clave, fn, ms=3000){
+  clearTimeout(_rtTimers[clave]);
+  _rtTimers[clave] = setTimeout(() => {
+    if((typeof _syncingORCID!=='undefined' && _syncingORCID) || (typeof _rebuildingCollabs!=='undefined' && _rebuildingCollabs)) return;
+    fn();
+  }, ms);
+}
+
 function subscribeRealtime() {
   if (realtimeChannel) { db.removeChannel(realtimeChannel); }
   realtimeChannel = db.channel('red-salud-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'researchers' }, async () => {
-      await loadResearchers();
-      refreshActiveView();
-      setSyncStatus('connected', 'Actualizado en tiempo real ✓');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'researchers' }, () => {
+      _rtDebounce('researchers', async () => {
+        await loadResearchers();
+        refreshActiveView();
+        setSyncStatus('connected', 'Actualizado en tiempo real ✓');
+      });
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, async () => {
-      await loadProjects();
-      refreshActiveView();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+      _rtDebounce('projects', async () => {
+        await loadProjects();
+        refreshActiveView();
+      });
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'publications' }, async () => {
-      await loadPublications();
-      refreshActiveView();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'publications' }, () => {
+      _rtDebounce('publications', async () => {
+        await loadPublications();
+        refreshActiveView();
+      });
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborations' }, async () => {
-      await loadCollaborations();
-      refreshActiveView();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborations' }, () => {
+      _rtDebounce('collaborations', async () => {
+        await loadCollaborations();
+        refreshActiveView();
+      });
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, async () => {
-      await loadEvents();
-      refreshActiveView();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+      _rtDebounce('events', async () => {
+        await loadEvents();
+        refreshActiveView();
+      });
     })
     .subscribe(status => {
       if (status === 'SUBSCRIBED') setSyncStatus('connected', 'Tiempo real activo');
@@ -3449,7 +3471,7 @@ function renderCollaborations() {
     if(porClasificar.length){
       uncCard.style.display = 'block';
       uncWrap.innerHTML = porClasificar.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.projects_count||c.projects||0} art. · <span style="color:var(--text3);">país no identificado</span></span></div>`).join('')
-        + '<p style="font-size:11px;color:var(--text3);margin-top:10px;">Estas instituciones no traen país en los datos de Crossref. No se muestran en el diagrama ni en las listas hasta clasificarse.</p>';
+        + '<p style="font-size:11px;color:var(--text3);margin-top:10px;">Estas instituciones no tienen país registrado en OpenAlex. No se muestran en el diagrama ni en las listas hasta clasificarse.</p>';
     } else {
       uncCard.style.display = 'none';
     }
@@ -3863,23 +3885,6 @@ async function saveCVUResearcher(){
       if(nuevas===0 && coautorias===0) msg+='Investigador guardado (sin publicaciones nuevas en ORCID)';
       notify(msg);
 
-      // ── Detectar colaboraciones institucionales externas vía Crossref ──
-      notify('🔄 Analizando afiliaciones de coautores (Crossref)…');
-      try{
-        const detectadas = await detectarColaboracionesExternas(works, (done,total)=>{
-          if(done % 5 === 0) setSyncStatus('loading', `Analizando colaboraciones ${done}/${total}…`);
-        });
-        const nNac = Object.keys(detectadas.nacionales).length;
-        const nInt = Object.keys(detectadas.internacionales).length;
-        if(nNac || nInt){
-          await guardarColaboraciones(detectadas);
-          notify(`🌐 Colaboraciones detectadas: ${nNac} nacionales · ${nInt} internacionales`);
-        }
-        setSyncStatus('connected','Sincronizado');
-      }catch(e){
-        console.warn('Crossref:', e.message);
-        setSyncStatus('connected','Sincronizado');
-      }
     }catch(e){
       notify('⚠ No se pudieron importar publicaciones de ORCID (perfil privado o sin conexión)');
     }
@@ -3933,16 +3938,181 @@ async function importarPublicacionesORCID(researcherName, orcid, opts={}){
       }
     }
   }
-  // Detectar colaboraciones externas (nacionales/internacionales) vía Crossref
-  if(!opts.skipCollabs && works.length){
-    try{
-      const detectadas = await detectarColaboracionesExternas(works);
-      const nNac = Object.keys(detectadas.nacionales).length;
-      const nInt = Object.keys(detectadas.internacionales).length;
-      if(nNac || nInt) await guardarColaboraciones(detectadas, {skipReload:true});
-    }catch(e){ console.warn('Crossref colabs:', e.message); }
-  }
   return {nuevas, coautorias, works};
+}
+
+// ═══════════════════════════════════════════════════════════
+// COLABORACIONES VÍA OPENALEX
+// Reconstruye la tabla de colaboraciones desde cero a partir de los DOI
+// de las publicaciones de la Red. OpenAlex entrega las instituciones ya
+// normalizadas (identificador único, país y jerarquía), lo que elimina
+// variantes de nombre, ruido y duplicados. Es idempotente: correrlo varias
+// veces produce el mismo resultado.
+// ═══════════════════════════════════════════════════════════
+const OA_BASE = 'https://api.openalex.org';
+const OA_LOTE = 50;              // valores por filtro OR
+let _rebuildingCollabs = false;  // pausa las recargas en tiempo real durante la reconstrucción
+
+function _oaNorm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
+function _oaDoi(d){ return String(d||'').trim().toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//,'').replace(/^doi:\s*/,''); }
+function _oaId(u){ return String(u||'').replace('https://openalex.org/',''); }
+function _oaEsIPN(nombre){
+  const n = _oaNorm(nombre);
+  return n === 'instituto politecnico nacional' || n === 'national polytechnic institute';
+}
+function _oaPais(cc){
+  if(!cc) return '';
+  try { return new Intl.DisplayNames(['es'], {type:'region'}).of(cc.toUpperCase()) || cc; }
+  catch(e){ return cc; }
+}
+async function _oaFetch(url){
+  for(let intento=0; intento<3; intento++){
+    try{
+      const res = await fetch(url);
+      if(res.status === 429){ await new Promise(r=>setTimeout(r, 1500*(intento+1))); continue; }
+      if(!res.ok) return null;
+      return await res.json();
+    }catch(e){ await new Promise(r=>setTimeout(r, 800)); }
+  }
+  return null;
+}
+
+async function reconstruirColaboraciones(opts={}){
+  if(!db || !isAdmin){ openLogin(); return; }
+  if(_rebuildingCollabs){ notify('Ya se están reconstruyendo las colaboraciones…'); return; }
+  if(!opts.sinConfirmar && !confirm('Se reconstruirán las colaboraciones consultando OpenAlex con los DOI de todas las publicaciones de la Red. Tarda uno o dos minutos.\n\n¿Continuar?')) return;
+  _rebuildingCollabs = true;
+  try{
+    if(!opts.datosCargados){ await loadPublications(); }
+
+    // 1) DOI → investigadores de la Red que firman ese artículo
+    const autoresPorDoi = new Map();
+    (appData.publications||[]).forEach(p => {
+      const d = _oaDoi(p.doi);
+      if(!d || /[,|]/.test(d)) return;
+      const set = autoresPorDoi.get(d) || new Set();
+      (p.network_authors||[]).forEach(a => set.add(a));
+      autoresPorDoi.set(d, set);
+    });
+    const dois = [...autoresPorDoi.keys()];
+    if(!dois.length){ notify('No hay publicaciones con DOI para analizar'); return; }
+
+    // 2) Consultar OpenAlex por lotes de DOI
+    const instDeDoi = new Map();      // doi → Set(id de institución)
+    const instInfo  = new Map();      // id → {display_name, country_code, lineage}
+    for(let i=0; i<dois.length; i+=OA_LOTE){
+      setSyncStatus('loading', `OpenAlex: artículos ${Math.min(i+OA_LOTE,dois.length)}/${dois.length}…`);
+      const lote = dois.slice(i, i+OA_LOTE);
+      const url = `${OA_BASE}/works?filter=doi:${lote.map(encodeURIComponent).join('|')}&select=doi,authorships&per-page=${OA_LOTE}`;
+      const data = await _oaFetch(url);
+      (data?.results||[]).forEach(w => {
+        const d = _oaDoi(w.doi);
+        const ids = new Set();
+        (w.authorships||[]).forEach(a => (a.institutions||[]).forEach(inst => {
+          if(!inst.id) return;
+          const id = _oaId(inst.id);
+          ids.add(id);
+          if(!instInfo.has(id)) instInfo.set(id, {
+            display_name: inst.display_name||'', country_code: inst.country_code||'',
+            lineage: (inst.lineage||[id]).map(_oaId)
+          });
+        }));
+        instDeDoi.set(d, ids);
+      });
+      await new Promise(r=>setTimeout(r, 120));
+    }
+
+    // 3) Traer los datos de todas las instituciones de la jerarquía (para subir a la raíz)
+    const ancestros = new Set();
+    instInfo.forEach(v => v.lineage.forEach(id => ancestros.add(id)));
+    const lista = [...ancestros];
+    const lineagePropio = new Map();  // id → lineage del propio ancestro
+    for(let i=0; i<lista.length; i+=OA_LOTE){
+      setSyncStatus('loading', `OpenAlex: instituciones ${Math.min(i+OA_LOTE,lista.length)}/${lista.length}…`);
+      const lote = lista.slice(i, i+OA_LOTE);
+      const data = await _oaFetch(`${OA_BASE}/institutions?filter=openalex:${lote.join('|')}&select=id,display_name,country_code,lineage&per-page=${OA_LOTE}`);
+      (data?.results||[]).forEach(x => {
+        const id = _oaId(x.id);
+        const lin = (x.lineage||[id]).map(_oaId);
+        lineagePropio.set(id, lin);
+        instInfo.set(id, { display_name: x.display_name||'', country_code: x.country_code||'', lineage: lin });
+      });
+      await new Promise(r=>setTimeout(r, 120));
+    }
+    // Raíz = el ancestro sin padre (el de jerarquía más corta)
+    function raiz(id){
+      const lin = instInfo.get(id)?.lineage || [id];
+      let mejor = id, largo = Infinity;
+      lin.forEach(a => {
+        const l = (lineagePropio.get(a) || instInfo.get(a)?.lineage || [a]).length;
+        if(l < largo){ largo = l; mejor = a; }
+      });
+      return mejor;
+    }
+    // El IPN y todo lo que cuelga de él se excluye
+    const idsIPN = new Set([...instInfo].filter(([,v]) => _oaEsIPN(v.display_name)).map(([k]) => k));
+    const esDelIPN = id => idsIPN.has(id) || (instInfo.get(id)?.lineage||[]).some(a => idsIPN.has(a));
+
+    // 4) Agregar por institución raíz: artículos distintos e investigadores distintos
+    const agg = new Map();
+    instDeDoi.forEach((ids, d) => {
+      const raices = new Set();
+      ids.forEach(id => { if(!esDelIPN(id)) raices.add(raiz(id)); });
+      raices.forEach(r => {
+        if(esDelIPN(r)) return;
+        const a = agg.get(r) || {dois:new Set(), autores:new Set()};
+        a.dois.add(d);
+        (autoresPorDoi.get(d)||[]).forEach(x => a.autores.add(x));
+        agg.set(r, a);
+      });
+    });
+
+    const filas = [...agg].map(([id, a]) => {
+      const info = instInfo.get(id) || {};
+      const cc = (info.country_code||'').toUpperCase();
+      return {
+        inst: info.display_name || id,
+        city: null,
+        country: cc ? _oaPais(cc) : '',
+        type: cc === 'MX' ? 'national' : 'international',
+        projects_count: a.dois.size,
+        researchers_count: a.autores.size,
+        openalex_id: id
+      };
+    }).filter(f => f.inst);
+
+    if(!filas.length){ notify('OpenAlex no devolvió instituciones. Se conservan las colaboraciones actuales.'); return; }
+
+    // 5) Reemplazo seguro: primero insertar las nuevas, luego borrar las anteriores
+    setSyncStatus('loading', 'Guardando colaboraciones…');
+    const { data: viejas } = await db.from('collaborations').select('id');
+    const idsViejos = (viejas||[]).map(r => r.id);
+    let conOpenAlexId = true;
+    for(let i=0; i<filas.length; i+=200){
+      let lote = filas.slice(i, i+200);
+      if(!conOpenAlexId) lote = lote.map(({openalex_id, ...r}) => r);
+      let { error } = await db.from('collaborations').insert(lote);
+      if(error && /openalex_id/.test(error.message)){
+        conOpenAlexId = false;
+        ({ error } = await db.from('collaborations').insert(lote.map(({openalex_id, ...r}) => r)));
+      }
+      if(error){ notify('✕ Error al guardar colaboraciones: '+error.message+'. Se conservan las anteriores.'); return; }
+    }
+    for(let i=0; i<idsViejos.length; i+=200){
+      await db.from('collaborations').delete().in('id', idsViejos.slice(i, i+200));
+    }
+
+    await loadCollaborations();
+    refreshActiveView();
+    const nNac = filas.filter(f=>f.type==='national').length;
+    const nInt = filas.length - nNac;
+    const sinDoi = (appData.publications||[]).length - dois.length;
+    notify(`✓ ${filas.length} instituciones colaboradoras: ${nNac} nacionales · ${nInt} internacionales (${dois.length} artículos analizados${sinDoi>0?`, ${sinDoi} sin DOI`:''})`);
+  } finally {
+    setSyncStatus('connected', 'Sincronizado');
+    // Esperar a que lleguen los avisos en tiempo real pendientes antes de reactivarlos
+    setTimeout(() => { _rebuildingCollabs = false; }, 4000);
+  }
 }
 
 // Sincroniza TODOS los investigadores con ORCID
@@ -3950,7 +4120,7 @@ let _syncingORCID = false;
 async function sincronizarTodosORCID(){
   if(!db || !isAdmin){ openLogin(); return; }
   if(_syncingORCID){ notify('Ya hay una sincronización en curso…'); return; }
-  const conf = confirm('La sincronización consultará ORCID y Crossref para cada investigador. Puede tardar varios minutos.\n\n¿Continuar?');
+  const conf = confirm('La sincronización consultará ORCID para cada investigador y después reconstruirá las colaboraciones con OpenAlex. Puede tardar varios minutos.\n\n¿Continuar?');
   if(!conf) return;
   _syncingORCID = true;
   // Cargar UNA SOLA VEZ el estado necesario (evita descargar la tabla por cada investigador)
@@ -3969,9 +4139,9 @@ async function sincronizarTodosORCID(){
     if(res.works) await guardarTotalORCID(r.id, res.works.length);
     await new Promise(res=>setTimeout(res, 200)); // cortesía con ORCID
   }
-  // Recargar una sola vez al final
+  // Recargar una sola vez al final y reconstruir las colaboraciones
   await loadPublications();
-  await loadCollaborations();
+  await reconstruirColaboraciones({sinConfirmar:true, datosCargados:true});
   refreshActiveView();
   setSyncStatus('connected', 'Sincronizado');
   notify(totalNuevas>0 ? `✓ ${totalNuevas} publicaciones nuevas importadas desde ORCID` : '✓ Todo al día — sin publicaciones nuevas en ORCID');
