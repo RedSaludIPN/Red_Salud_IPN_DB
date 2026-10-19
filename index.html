@@ -6,6 +6,8 @@
 <title>REI06-RSAL | Red de Salud — Instituto Politécnico Nacional</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 /* ════════════════════════════════════════════════════
@@ -707,6 +709,11 @@ body {
   border-radius: var(--radius-lg); background: var(--bg); position: relative; overflow: hidden;
 }
 #map-container { height: 460px; }
+.collab-map { height: 460px; border-radius: var(--radius); border: 1px solid var(--border); z-index: 0; }
+.collab-map .leaflet-popup-content { margin: 10px 12px; }
+.info-row.clicable { cursor: pointer; }
+.info-row.clicable:hover .ir-label { color: var(--guinda); text-decoration: underline; }
+@media (max-width: 640px){ .collab-map { height: 320px; } }
 #network-container { height: 420px; }
 .map-legend { display: flex; gap: 18px; margin-top: 10px; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
@@ -1397,15 +1404,23 @@ svg g[onclick]:hover circle { opacity: 1 !important; }
   <!-- COLABORACIONES -->
   <section class="section" id="section-collaborations">
     <div class="section-header"><div class="sh-left"><div class="sh-eyebrow">Vinculaciones y alianzas</div><div class="sh-title">Colaboraciones</div></div></div>
-    <div class="card mt-16" style="margin-bottom:20px;">
+    <div class="card mt-16" id="collab-maps-card" style="margin-bottom:20px;">
       <div class="card-body">
-        <div id="map-container"><svg id="world-map" style="width:100%;height:100%;" viewBox="0 0 900 500"></svg></div>
-        <div class="map-legend mt-16">
-          <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);width:12px;height:12px;"></div>Red de Salud IPN</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#1E7D35;"></div>Nacional</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--gold);"></div>Internacional</div>
+        <div class="filter-row" id="collab-tabs" style="margin-bottom:12px;">
+          <button class="fc active" data-tab="national" onclick="mostrarMapaColab('national')">🇲🇽 México</button>
+          <button class="fc" data-tab="international" onclick="mostrarMapaColab('international')">🌍 Mundo</button>
+          <button class="fc" data-tab="red" onclick="mostrarMapaColab('red')">🕸️ Red de colaboración</button>
         </div>
-        <p style="font-size:11.5px;color:var(--text3);margin-top:7px;">El tamaño de cada nodo refleja el número de colaboraciones. Pasa el cursor para ver los detalles, o arrastra para explorar.</p>
+        <div id="collab-panel-national"><div id="map-mx" class="collab-map"></div></div>
+        <div id="collab-panel-international" style="display:none;"><div id="map-world" class="collab-map"></div></div>
+        <div id="collab-panel-red" style="display:none;"><div id="map-container"><svg id="world-map" style="width:100%;height:100%;" viewBox="0 0 900 500"></svg></div></div>
+        <div class="map-legend mt-16">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--guinda);"></div>Red de Salud IPN</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1E7D35;"></div>Nacional</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--gold);border:1.5px solid #7A5A06;"></div>Internacional</div>
+        </div>
+        <p style="font-size:11.5px;color:var(--text3);margin-top:7px;">Cada burbuja es una ciudad: su tamaño refleja los artículos en coautoría con sus instituciones. Pasa el cursor para ver el resumen, haz clic para ver las instituciones; haz clic en el mapa para activar el zoom con la rueda.</p>
+        <p id="map-aviso" style="font-size:11.5px;color:var(--text2);margin-top:4px;"></p>
       </div>
     </div>
 
@@ -1838,7 +1853,7 @@ function showSection(id) {
   if (id === 'projects') renderProjects();
   if (id === 'publications') renderPublications();
   if (id === 'network') setTimeout(renderNetwork, 120);
-  if (id === 'collaborations') renderCollaborations();
+  if (id === 'collaborations'){ renderCollaborations(); setTimeout(()=>{ Object.values(_mapas).forEach(m=>m&&m.invalidateSize()); }, 60); }
   if (id === 'calendar') renderCalendar();
   if (id === 'admin') renderAdmin();
 }
@@ -3430,6 +3445,155 @@ function renderCollabGraph(svg, nat, intl){
   svg.innerHTML = s;
 }
 
+// ═══════════════════════════════════════════════════════════
+// MAPAS INTERACTIVOS DE COLABORACIÓN (Leaflet)
+// México para las nacionales, el mundo para las internacionales.
+// Cada burbuja es una ciudad; su tamaño es el número de artículos en
+// coautoría con instituciones de esa ciudad. Las coordenadas vienen de
+// OpenAlex y se guardan al reconstruir las colaboraciones.
+// ═══════════════════════════════════════════════════════════
+const IPN_SEDE = { lat: 19.4995, lng: -99.1335, nombre: 'Instituto Politécnico Nacional (Zacatenco)' };
+const MAPA_COLOR = {
+  national:      { fill: '#1E7D35', stroke: '#14531F' },
+  international: { fill: '#C8960C', stroke: '#7A5A06' }
+};
+const _mapas = { national: null, international: null };
+let _mapaTab = 'national';
+let _mapaPuntos = { national: [], international: [] };
+
+function _escHtml(s){ return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// Agrupa instituciones por ciudad (o por coordenada si no hay ciudad)
+function agruparPorCiudad(lista){
+  const grupos = new Map();
+  lista.forEach(c => {
+    const lat = parseFloat(c.lat), lng = parseFloat(c.lng);
+    if(!isFinite(lat) || !isFinite(lng)) return;
+    const clave = (c.city ? c.city+'|'+(c.country||'') : lat.toFixed(2)+','+lng.toFixed(2));
+    const g = grupos.get(clave) || { ciudad: c.city || '', region: c.region || '', pais: c.country || '', lat:0, lng:0, n:0, articulos:0, inst:[] };
+    g.lat += lat; g.lng += lng; g.n++;
+    g.articulos += (c.projects_count||0);
+    g.inst.push(c);
+    grupos.set(clave, g);
+  });
+  return [...grupos.values()].map(g => ({ ...g, lat: g.lat/g.n, lng: g.lng/g.n,
+    inst: g.inst.sort((a,b)=>(b.projects_count||0)-(a.projects_count||0)) }))
+    .sort((a,b)=>b.articulos-a.articulos);
+}
+
+function _popupCiudad(g){
+  const lugar = [g.ciudad, g.region && g.region!==g.ciudad ? g.region : '', g.pais].filter(Boolean).join(', ') || 'Ubicación';
+  const max = 8;
+  const filas = g.inst.slice(0,max).map(c =>
+    `<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid #eee;">
+       <span>${_escHtml(c.inst)}</span>
+       <span style="white-space:nowrap;font-weight:700;color:#4E0E28;">${c.projects_count||0} art.</span>
+     </div>`).join('');
+  const resto = g.inst.length>max ? `<div style="color:#777;margin-top:4px;">y ${g.inst.length-max} institución(es) más</div>` : '';
+  return `<div style="font-family:'Open Sans',Arial,sans-serif;font-size:12px;min-width:220px;max-width:300px;">
+    <div style="font-family:Montserrat,Arial,sans-serif;font-weight:800;color:#6A1537;font-size:13px;margin-bottom:2px;">${_escHtml(lugar)}</div>
+    <div style="color:#555;margin-bottom:6px;">${g.articulos} artículo(s) · ${g.inst.length} institución(es)</div>
+    ${filas}${resto}</div>`;
+}
+
+function _crearMapa(tipo){
+  const el = document.getElementById(tipo==='national' ? 'map-mx' : 'map-world');
+  if(!el || typeof L==='undefined') return null;
+  const mapa = L.map(el, { scrollWheelZoom: false, worldCopyJump: true, minZoom: 1 });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> · Datos: OpenAlex',
+    subdomains: 'abcd', maxZoom: 18
+  }).addTo(mapa);
+  // Rueda del ratón solo tras hacer clic en el mapa (no secuestra el scroll de la página)
+  mapa.on('click', () => mapa.scrollWheelZoom.enable());
+  mapa.on('mouseout', () => mapa.scrollWheelZoom.disable());
+  mapa._capa = L.layerGroup().addTo(mapa);
+  return mapa;
+}
+
+function renderCollabMaps(nat, intl){
+  const aviso = document.getElementById('map-aviso');
+  if(typeof L === 'undefined'){
+    if(aviso) aviso.textContent = 'No se pudo cargar el mapa (revisa tu conexión). Las listas de abajo muestran todas las colaboraciones.';
+    return;
+  }
+  const datos = { national: nat, international: intl };
+  let sinUbicacion = 0;
+  ['national','international'].forEach(tipo => {
+    if(!_mapas[tipo]) _mapas[tipo] = _crearMapa(tipo);
+    const mapa = _mapas[tipo]; if(!mapa) return;
+    const capa = mapa._capa; capa.clearLayers();
+    const puntos = agruparPorCiudad(datos[tipo]);
+    sinUbicacion += datos[tipo].filter(c => !isFinite(parseFloat(c.lat))).length;
+    _mapaPuntos[tipo] = puntos;
+    const maxArt = Math.max(1, ...puntos.map(p=>p.articulos));
+    const col = MAPA_COLOR[tipo];
+
+    // Líneas tenues desde el IPN (solo en el mapa mundial, para dar sentido de red)
+    if(tipo==='international'){
+      puntos.forEach(p => L.polyline([[IPN_SEDE.lat, IPN_SEDE.lng],[p.lat, p.lng]], {
+        color: col.stroke, weight: 1, opacity: 0.22, interactive: false }).addTo(capa));
+    }
+    // Burbujas: área proporcional al número de artículos; las grandes debajo
+    [...puntos].sort((a,b)=>b.articulos-a.articulos).forEach(p => {
+      const r = 6 + 22*Math.sqrt(p.articulos/maxArt);
+      const m = L.circleMarker([p.lat, p.lng], {
+        radius: r, color: '#FFFFFF', weight: 2, fillColor: col.fill, fillOpacity: 0.78
+      }).addTo(capa);
+      m.bindTooltip(`<strong>${_escHtml(p.ciudad || p.pais)}</strong> · ${p.articulos} art.`, { direction: 'top', offset: [0, -r] });
+      m.bindPopup(_popupCiudad(p), { maxWidth: 320 });
+      m.on('mouseover', () => m.setStyle({ color: col.stroke, weight: 3, fillOpacity: 0.92 }));
+      m.on('mouseout',  () => m.setStyle({ color: '#FFFFFF', weight: 2, fillOpacity: 0.78 }));
+      p._marker = m;
+    });
+    // Sede del IPN
+    L.circleMarker([IPN_SEDE.lat, IPN_SEDE.lng], { radius: 7, color: '#FFFFFF', weight: 2, fillColor: '#6A1537', fillOpacity: 1 })
+      .bindTooltip('<strong>Red de Salud IPN</strong>', { direction: 'top', offset: [0,-7] }).addTo(capa);
+  });
+
+  // Encuadre inicial
+  if(_mapas.national){
+    const pts = _mapaPuntos.national;
+    if(pts.length) _mapas.national.fitBounds(L.latLngBounds([[IPN_SEDE.lat,IPN_SEDE.lng], ...pts.map(p=>[p.lat,p.lng])]).pad(0.15), { maxZoom: 6 });
+    else _mapas.national.fitBounds([[14.3,-118.6],[32.8,-86.5]]);
+  }
+  if(_mapas.international){
+    const pts = _mapaPuntos.international;
+    if(pts.length) _mapas.international.fitBounds(L.latLngBounds([[IPN_SEDE.lat,IPN_SEDE.lng], ...pts.map(p=>[p.lat,p.lng])]).pad(0.1), { maxZoom: 4 });
+    else _mapas.international.setView([20, 0], 2);
+  }
+
+  // Resumen bajo el mapa
+  if(aviso){
+    const nCiudadesMx = _mapaPuntos.national.length, nCiudadesW = _mapaPuntos.international.length;
+    const paises = new Set(intl.map(c=>c.country).filter(Boolean)).size;
+    aviso.innerHTML = `México: ${nat.length} instituciones en ${nCiudadesMx} ciudades · Mundo: ${intl.length} instituciones en ${paises} países`
+      + (sinUbicacion ? ` · <span style="color:#8B6914;">${sinUbicacion} sin ubicación — presiona «Reconstruir colaboraciones» en Gestión de datos para obtenerla</span>` : '');
+  }
+  mostrarMapaColab(_mapaTab);
+}
+
+function mostrarMapaColab(tipo, btn){
+  _mapaTab = tipo;
+  document.querySelectorAll('#collab-tabs .fc').forEach(b => b.classList.toggle('active', b.dataset.tab===tipo));
+  ['national','international','red'].forEach(t => {
+    const p = document.getElementById('collab-panel-'+t);
+    if(p) p.style.display = (t===tipo) ? 'block' : 'none';
+  });
+  // Leaflet necesita recalcular su tamaño al hacerse visible
+  if(_mapas[tipo]) setTimeout(() => _mapas[tipo].invalidateSize(), 30);
+}
+
+// Desde las listas: centrar el mapa en una institución y abrir su ciudad
+function enfocarColab(tipo, nombre){
+  if(!_mapas[tipo]) return;
+  const p = (_mapaPuntos[tipo]||[]).find(g => g.inst.some(c => c.inst===nombre));
+  if(!p){ notify('Esta institución aún no tiene ubicación en el mapa'); return; }
+  mostrarMapaColab(tipo);
+  document.getElementById('collab-maps-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => { _mapas[tipo].flyTo([p.lat, p.lng], tipo==='national' ? 9 : 5, { duration: 0.8 }); p._marker && p._marker.openPopup(); }, 350);
+}
+
 function renderCollaborations() {
   const svg = document.getElementById('world-map');
 
@@ -3446,6 +3610,7 @@ function renderCollaborations() {
 
   // ── Grafo estilo ResearchRabbit (solo con país válido) ──
   renderCollabGraph(svg, nat, intlConPais);
+  renderCollabMaps(nat, intlConPais);
 
   // ── Colaboraciones entre unidades académicas ──
   const unitWrap = document.getElementById('unit-collabs');
@@ -3458,10 +3623,10 @@ function renderCollaborations() {
 
   // ── Listas nacionales / internacionales (orden alfabético) ──
   document.getElementById('national-collabs').innerHTML = nat.length
-    ? nat.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.city||'México'} · ${c.projects_count||c.projects||0} art.</span></div>`).join('')
+    ? nat.map(c=>`<div class="info-row clicable" title="Ver en el mapa" onclick="enfocarColab('national', this.dataset.inst)" data-inst="${_escHtml(c.inst)}"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.city||'México'} · ${c.projects_count||c.projects||0} art.</span></div>`).join('')
     : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones nacionales registradas.</div></div>';
   document.getElementById('international-collabs').innerHTML = intlConPais.length
-    ? intlConPais.map(c=>`<div class="info-row"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${c.country||c.pais} · ${c.projects_count||c.projects||0} art.</span></div>`).join('')
+    ? intlConPais.map(c=>`<div class="info-row clicable" title="Ver en el mapa" onclick="enfocarColab('international', this.dataset.inst)" data-inst="${_escHtml(c.inst)}"><span class="ir-label">${c.inst}</span><span class="ir-value" style="font-size:12.5px;">${[c.city,c.country||c.pais].filter(Boolean).join(', ')} · ${c.projects_count||c.projects||0} art.</span></div>`).join('')
     : '<div class="empty-state" style="padding:20px;"><div class="empty-desc">Sin colaboraciones internacionales registradas.</div></div>';
 
   // ── Por clasificar (sin país) ──
@@ -3527,7 +3692,68 @@ async function extractFormFields(buf){
       });
     }
   }
+  // Método 3: ficha APLANADA (impresa a PDF desde Chrome, Vista Previa, etc.).
+  // Ya no hay campos, pero el texto conserva la posición: cada dato queda
+  // justo debajo de su etiqueta. Se reconstruyen los campos por posición.
+  if(Object.keys(fields).length === 0){
+    const leidos = await extraerFichaAplanada(pdf);
+    if(leidos){ Object.assign(fields, leidos); fields.__aplanada = '1'; }
+  }
   return fields;
+}
+
+// Etiqueta de la plantilla → campo y columna (I: izquierda, D: derecha, C: completa)
+const FICHA_ETIQUETAS = [
+  ['Nombre(s)','nombre','I'], ['Primer apellido','apellido1','D'],
+  ['Segundo apellido','apellido2','I'], ['Sexo','sexo','D'],
+  ['Unidad Académica','unidad','C'], ['Departamento','departamento','I'],
+  ['Laboratorio','laboratorio','D'], ['Extensión IPN','extension','I'],
+  ['Nivel del SNII','snii','D'], ['Correo institucional','correo','C'],
+  ['Área de la Red de Salud','area_red','C'], ['Disciplina','disciplina','C'],
+  ['Liga ORCID','orcid','C'], ['Liga Scopus','scopus','C'], ['Liga Google Scholar','scholar','C']
+];
+async function extraerFichaAplanada(pdf){
+  const pg = await pdf.getPage(1);
+  const vp = pg.getViewport({scale:1});
+  const mitad = vp.width/2;
+  const tc = await pg.getTextContent();
+  // Agrupar fragmentos de texto por renglón (coordenada vertical medida desde arriba)
+  const items = tc.items.filter(it => it.str && it.str.trim()).map(it => ({
+    t: it.str, x: it.transform[4], y: Math.round(vp.height - it.transform[5])
+  }));
+  if(items.length < 10) return null;           // sin texto: es una imagen escaneada
+  const renglones = {};
+  items.forEach(it => {
+    const k = Object.keys(renglones).map(Number).find(y => Math.abs(y - it.y) <= 2);
+    (renglones[k!==undefined ? k : it.y] ||= []).push(it);
+  });
+  const ys = Object.keys(renglones).map(Number).sort((a,b)=>a-b);
+  const enColumna = (it,col) => col==='C' || (col==='I' ? it.x < mitad : it.x >= mitad);
+  const esEtiqueta = t => FICHA_ETIQUETAS.some(([e]) => t.trim().startsWith(e));
+  const out = {}; let encontradas = 0;
+  FICHA_ETIQUETAS.forEach(([etq, clave, col]) => {
+    let y0 = null;
+    for(const y of ys){
+      if(renglones[y].some(it => it.t.trim().startsWith(etq) && (col!=='D' || it.x >= mitad) && (col!=='I' || it.x < mitad))){ y0 = y; break; }
+    }
+    if(y0 === null) return;
+    encontradas++;
+    const partes = [];
+    ys.filter(y => y > y0+5 && y <= y0+24).forEach(y => {
+      renglones[y].filter(it => enColumna(it,col) && !esEtiqueta(it.t)).sort((a,b)=>a.x-b.x).forEach(it => partes.push(it.t));
+    });
+    let v = partes.join(' ').replace(/\s+/g,' ').trim();
+    // Al imprimir, el guion largo de "SIGLA — Nombre" a veces se pierde: se
+    // reconoce la sigla contra el catálogo y se restituye el separador.
+    if(clave==='unidad' && v && !/\s[—–]\s/.test(v)){
+      const sigla = Object.keys(UNIDADES_IPN).sort((a,b)=>b.length-a.length)
+        .find(k => v.toUpperCase().startsWith(k.toUpperCase()+' ') || v.toUpperCase()===k.toUpperCase());
+      if(sigla) v = v.slice(0, sigla.length) + ' — ' + v.slice(sigla.length).replace(/^[\s\-–—]+/,'');
+    }
+    if(v) out[clave] = v;
+  });
+  // Solo es la plantilla si se reconocen la mayoría de las etiquetas
+  return encontradas >= 10 ? out : null;
 }
 
 // Mapea el Área de la Red al área interna del selector
@@ -3573,7 +3799,7 @@ function parseFichaRegistro(fields){
     dept: fields.departamento ? toTitleCase(fields.departamento) : '',
     laboratorio: fields.laboratorio || '',
     ext: fields.extension || '',
-    email: (fields.correo||'').toLowerCase().trim(),
+    email: (fields.correo||'').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,''),
     lines,
     sni: fields.snii || 'No aplica',
     areaRed: mapAreaRed(areaRed) || areaRed,
@@ -3727,9 +3953,10 @@ function handleCVUFile(input){
         document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-warn" style="font-size:13px;">🔄 Leyendo campos de la ficha de registro…</div>`;
         const fields = await extractFormFields(e.target.result);
         if(Object.keys(fields).length === 0){
-          document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-err" style="font-size:13px;">✕ El PDF no contiene campos de formulario. Asegúrate de usar la plantilla oficial y de haberla guardado con los datos escritos.</div>`;
+          document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-err" style="font-size:13px;">✕ No se pudieron leer los datos: el PDF parece ser una <strong>imagen</strong> (por ejemplo, impreso con «Microsoft Print to PDF» o escaneado). Captura los datos a mano en el formulario de la derecha, o pide al investigador que la reenvíe guardándola desde Adobe Acrobat Reader.</div>`;
           return;
         }
+        const eraAplanada = !!fields.__aplanada; delete fields.__aplanada;
         const d = parseFichaRegistro(fields);
         // Volcar a los campos del formulario
         if(d.nombre) document.getElementById('cvu-name').value=d.nombre;
@@ -3750,7 +3977,7 @@ function handleCVUFile(input){
         const orcidNote = d.orcid
           ? '<div style="font-size:11.5px;color:var(--guinda);margin-top:6px;">📚 Al guardar, las publicaciones se importarán automáticamente desde ORCID.</div>'
           : '<div style="font-size:11.5px;color:#8B6914;margin-top:6px;">⚠ Sin ORCID válido — no se podrán importar publicaciones automáticamente.</div>';
-        document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-ok"><div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#1E7D35;margin-bottom:6px;">✓ Ficha leída correctamente</div><div style="font-size:12px;color:var(--text2);">${campos.join(' · ')}</div>${orcidNote}<div style="font-size:11.5px;color:var(--text3);margin-top:6px;">Revisa los datos antes de guardar.</div></div>`;
+        document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-ok"><div style="font-family:var(--font-head);font-size:12px;font-weight:700;color:#1E7D35;margin-bottom:6px;">✓ Ficha leída correctamente</div><div style="font-size:12px;color:var(--text2);">${campos.join(' · ')}</div>${orcidNote}${eraAplanada?'<div style="font-size:11.5px;color:#8B6914;margin-top:6px;">⚠ Esta ficha venía aplanada (sin campos de formulario); los datos se reconstruyeron del texto. Revísalos con atención.</div>':''}<div style="font-size:11.5px;color:var(--text3);margin-top:6px;">Revisa los datos antes de guardar.</div></div>`;
         notify(`✓ ${campos.length} campos leídos de la ficha`);
       }catch(ex){console.error(ex);document.getElementById('cvu-result-area').innerHTML=`<div class="cvu-err" style="font-size:13px;">✕ Error al procesar el PDF. Captura los datos manualmente.</div>`;}
     };reader.readAsArrayBuffer(file);
@@ -4030,12 +4257,12 @@ async function reconstruirColaboraciones(opts={}){
     for(let i=0; i<lista.length; i+=OA_LOTE){
       setSyncStatus('loading', `OpenAlex: instituciones ${Math.min(i+OA_LOTE,lista.length)}/${lista.length}…`);
       const lote = lista.slice(i, i+OA_LOTE);
-      const data = await _oaFetch(`${OA_BASE}/institutions?filter=openalex:${lote.join('|')}&select=id,display_name,country_code,lineage&per-page=${OA_LOTE}`);
+      const data = await _oaFetch(`${OA_BASE}/institutions?filter=openalex:${lote.join('|')}&select=id,display_name,country_code,lineage,geo&per-page=${OA_LOTE}`);
       (data?.results||[]).forEach(x => {
         const id = _oaId(x.id);
         const lin = (x.lineage||[id]).map(_oaId);
         lineagePropio.set(id, lin);
-        instInfo.set(id, { display_name: x.display_name||'', country_code: x.country_code||'', lineage: lin });
+        instInfo.set(id, { display_name: x.display_name||'', country_code: x.country_code||'', lineage: lin, geo: x.geo||null });
       });
       await new Promise(r=>setTimeout(r, 120));
     }
@@ -4072,7 +4299,10 @@ async function reconstruirColaboraciones(opts={}){
       const cc = (info.country_code||'').toUpperCase();
       return {
         inst: info.display_name || id,
-        city: null,
+        city: info.geo?.city || null,
+        region: info.geo?.region || null,
+        lat: (info.geo && info.geo.latitude!=null) ? info.geo.latitude : null,
+        lng: (info.geo && info.geo.longitude!=null) ? info.geo.longitude : null,
         country: cc ? _oaPais(cc) : '',
         type: cc === 'MX' ? 'national' : 'international',
         projects_count: a.dois.size,
@@ -4090,11 +4320,12 @@ async function reconstruirColaboraciones(opts={}){
     let conOpenAlexId = true;
     for(let i=0; i<filas.length; i+=200){
       let lote = filas.slice(i, i+200);
-      if(!conOpenAlexId) lote = lote.map(({openalex_id, ...r}) => r);
+      if(!conOpenAlexId) lote = lote.map(({openalex_id, region, lat, lng, ...r}) => r);
       let { error } = await db.from('collaborations').insert(lote);
-      if(error && /openalex_id/.test(error.message)){
+      if(error && /openalex_id|region|'lat'|'lng'|column/.test(error.message)){
         conOpenAlexId = false;
-        ({ error } = await db.from('collaborations').insert(lote.map(({openalex_id, ...r}) => r)));
+        ({ error } = await db.from('collaborations').insert(lote.map(({openalex_id, region, lat, lng, ...r}) => r)));
+        if(!error) notify('⚠ Falta ejecutar supabase_update_v10.sql: las colaboraciones se guardaron sin ubicación para el mapa.');
       }
       if(error){ notify('✕ Error al guardar colaboraciones: '+error.message+'. Se conservan las anteriores.'); return; }
     }
